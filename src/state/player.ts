@@ -1,0 +1,34 @@
+import { create } from 'zustand';
+
+import type { Track } from '@/db/queries';
+import type { RepeatMode } from '@/services/playback/queue';
+
+/**
+ * Observable player state. Written only by PlaybackService; UI reads it and
+ * calls PlaybackService for actions.
+ */
+export interface PlayerState {
+  queue: Track[]; // playback order
+  originalQueue: Track[]; // order before shuffle
+  index: number;
+  isPlaying: boolean;
+  isBuffering: boolean;
+  position: number; // seconds
+  duration: number; // seconds
+  repeat: RepeatMode;
+  shuffle: boolean;
+}
+
+export const usePlayer = create<PlayerState>(() => ({
+  queue: [],
+  originalQueue: [],
+  index: 0,
+  isPlaying: false,
+  isBuffering: false,
+  position: 0,
+  duration: 0,
+  repeat: 'off',
+  shuffle: false,
+}));
+
+export const selectCurrentTrack = (s: PlayerState): Track | undefined => s.queue[s.index];

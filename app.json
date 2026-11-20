@@ -45,7 +45,17 @@
           "photosPermission": false,
           "savePhotosPermission": false
         }
-      ]
+      ],
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": true,
+          "recordAudioAndroid": false,
+          "microphonePermission": false
+        }
+      ],
+      "expo-font",
+      "expo-asset"
     ],
     "scheme": "localtunes",
     "experiments": {

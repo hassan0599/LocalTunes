@@ -6,31 +6,37 @@ Implements [the technical spec](./Offline-First%20Music%20Player%20Technical%20S
 
 | # | Spec says | Change | Why |
 |---|---|---|---|
-| 1 | react-native-track-player | **Not installed yet. Decide in M1 spike** (see below) | RNTP 4.1.2 (latest stable) does not support the New Architecture, and RN 0.88 requires it. `expo install` warns about this. |
+| 1 | react-native-track-player | **expo-audio `AudioPlaylist`** (decided in M1, see below) | RNTP 4.1.2 (latest stable) does not support the New Architecture, and RN 0.88 requires it. SDK 58's expo-audio has a native playlist with lock-screen next and previous, background playback and audio focus. |
 | 2 | `createDownloadResumable` | Import it from `expo-file-system/legacy`, or use the new `File`/`Directory` API if it supports resuming | SDK 58 moved the resumable API under `legacy` |
-| 3 | `tracks` columns | Added `license`, `last_played_at`. `downloads` gets `attempts` and `UNIQUE(source, source_id)` | 6.4 stores the license per track. 6.1 boosts recently played tracks. 6.4 retries up to 3 times |
-| 4 | Tag reading (6.1) unspecified | Pick a library in M1 | Nothing in the stack reads ID3/MP4/FLAC tags from imported files |
+| 3 | `tracks` columns | Added `license`, `last_played_at`, `album_artist`, `track_no`, `artwork_uri`. `downloads` gets `attempts` and `UNIQUE(source, source_id)` | 6.4 stores the license per track. 6.1 boosts recently played tracks. 6.4 retries up to 3 times. Album grouping and embedded cover art need the tag fields |
+| 4 | Tag reading (6.1) unspecified | **In-house reader** `services/media/tags.ts`: ID3v1/v2, FLAC, MP4, plus duration. Reads only the bytes it needs through expo-file-system `FileHandle` | No maintained RN-compatible library. A small pure-TS reader is unit-tested in Node. OGG/Opus falls back to the file name (TODO) |
+| 6 | Media library scan (6.1) | expo-media-library returns file name and duration only, not artist or album | M2 scan runs the same tag reader over device files |
 | 5 | Wishlist is an open question | Add a `wishlist` table in M3 | Cheap, and it keeps Discover useful when no playable source exists |
 
-### Playback spike (first task of M1, about 1 day)
+### Playback decision
 
-Build a dev client on a real Android device and test: background playback, lock-screen controls, next and previous from the notification, and audio-focus interruption.
+**expo-audio** is the engine. `services/playback/PlaybackService.ts` wraps one native `AudioPlaylist`: interruption mode `doNotMix`, background playback on, lock-screen controls with next and previous. The queue (playback order and pre-shuffle order) lives in `state/player.ts` and is persisted to `settings`.
 
-1. **expo-audio** (first-party, already the prototype). Check SDK 58's lock-screen and background support. The queue lives in a Zustand store and is persisted to `settings`.
-2. **react-native-audio-pro** (New Architecture, built for this use case) if expo-audio cannot handle remote next and previous or audio focus.
-3. RNTP v5 nightly only if both fail. Not recommended for v1.
+If on-device testing shows gaps (remote next/previous, focus loss during calls), the fallback is **react-native-audio-pro** behind the same `PlaybackService` functions. The UI never imports expo-audio directly.
 
-Whatever wins sits behind a `PlaybackService` interface in `src/services/playback/`, so the UI never imports the library directly.
+## Toolchain
+- **Node 22.13 or later** (SDK 58 requirement). Node 24 is installed via nvm.
+- **JDK 17** for Gradle (`JAVA_HOME` must not point at the system JRE 8).
+- Android SDK at `%LOCALAPPDATA%\Android\Sdk`. Test device: Galaxy A32 5G, Android 13.
+- **Windows long paths:** the SDK's CMake 3.22.1 ships ninja 1.10.2, which fails on react-native-reanimated's long object paths. It was replaced with ninja 1.12.1 (old copy kept as `ninja-1.10.2.exe.bak` in `cmake\3.22.1\bin`). Reapply if the SDK's CMake is reinstalled. `subst` does not help, because autolinking resolves real paths.
+- **Device connection:** run `adb reverse tcp:8081 tcp:8081` and load `http://localhost:8081` in the dev client. The LAN URL hangs (Windows firewall).
+- Build from PowerShell with `$env:JAVA_HOME` set. A `JAVA_HOME` exported from Git Bash did not reach Gradle.
 
 ## Milestones
 
 ### M1 · Foundation (1 to 2 weeks)
-- Playback spike (above), then `PlaybackService` + `state/player.ts` (queue, repeat, shuffle, resume position every 5 s).
-- Choose a tag library; `services/media/importer.ts` (document picker → copy into `Paths.document/music/` → read tags, falling back to the file name → insert into `tracks`).
-- `db/queries.ts`: typed query helpers. Schema v1 is already in `db/schema.ts`.
-- Library tab: songs, albums and artists lists (FlashList if 10k rows lag), long-press actions.
-- MiniPlayer above the tab bar; Now Playing modal.
-- Add `jest-expo` for logic tests.
+- [x] `PlaybackService` + `state/player.ts` (queue, repeat, shuffle, play next, add to queue, resume position every 5 s, play counts).
+- [x] Tag reader + `services/media/importer.ts` (document picker → move into `Paths.document/music/` → read tags, falling back to the file name → insert into `tracks`, embedded cover → `Paths.document/covers/`).
+- [x] `db/queries.ts`: typed query helpers.
+- [x] Library tab: songs (sortable), albums grid, artists; album and artist pages; long-press actions (play next, add to queue, delete).
+- [x] MiniPlayer above the tab bar; Now Playing modal with seek, shuffle, repeat, up next.
+- [x] `jest-expo` with tests for the tag reader and queue logic.
+- [x] On-device verification on a Galaxy A32 (Android 13), 2026-11-20: import, playback, lock-screen controls, Now Playing, resume after app kill.
 - **Exit:** on an Android device, import a file, play it with the screen locked, and resume after an app kill.
 
 ### M2 · Local search (1 week)

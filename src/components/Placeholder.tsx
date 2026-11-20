@@ -1,17 +1,22 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { ScreenHeader } from './ScreenHeader';
+import { useTheme } from './theme';
+
 /** Temporary screen body used until each milestone fills in its screen. */
 export function Placeholder({ title, milestone }: { title: string; milestone: string }) {
+  const t = useTheme();
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.note}>Coming in {milestone}</Text>
+    <View style={[styles.screen, { backgroundColor: t.bg }]}>
+      <ScreenHeader title={title} />
+      <View style={styles.body}>
+        <Text style={{ color: t.textMuted }}>Coming in {milestone}</Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
-  title: { fontSize: 22, fontWeight: '600' },
-  note: { opacity: 0.6 },
+  screen: { flex: 1 },
+  body: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

@@ -7,15 +7,19 @@ export const DB_NAME = 'localtunes.db';
  * Never edit a shipped migration; append a new one.
  */
 const MIGRATIONS: string[] = [
-  // v1 — spec section 4, plus `license` on tracks (required by spec 6.4).
+  // v1 — spec section 4, plus `license` (spec 6.4), recency (6.1) and tag fields
+  // (album_artist, track_no, artwork_uri) used for album grouping and cover art.
   `
   CREATE TABLE tracks (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     title       TEXT NOT NULL,
     artist      TEXT,
     album       TEXT,
+    album_artist TEXT,
+    track_no    INTEGER,
     duration_ms INTEGER,
     file_uri    TEXT NOT NULL UNIQUE,
+    artwork_uri TEXT,
     source      TEXT NOT NULL CHECK (source IN ('imported','device','internet_archive','jamendo')),
     license     TEXT,
     mbid        TEXT,
