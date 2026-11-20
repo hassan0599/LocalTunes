@@ -186,7 +186,18 @@ export function RecordingRow({ rec, match }: { rec: MbRecording; match?: Track }
       {match ? (
         <Ionicons name="play-circle" size={28} color={t.accent} style={{ marginRight: 8 }} />
       ) : (
-        <WishlistButton mbid={rec.id} kind="recording" title={rec.title} artist={rec.artistCredit || null} />
+        <>
+          <IconButton
+            icon="download-outline"
+            label={`Find a free, legal download of ${rec.title}`}
+            color={t.accent}
+            size={22}
+            onPress={() =>
+              router.push({ pathname: '/get', params: { artist: rec.artists[0]?.name ?? rec.artistCredit, title: rec.title, mbid: rec.id } })
+            }
+          />
+          <WishlistButton mbid={rec.id} kind="recording" title={rec.title} artist={rec.artistCredit || null} />
+        </>
       )}
     </Pressable>
   );

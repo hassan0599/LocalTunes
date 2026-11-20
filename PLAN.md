@@ -59,11 +59,13 @@ If on-device testing shows gaps (remote next/previous, focus loss during calls),
 - Known limit: MusicBrainz has no popularity data, so tag browse order is arbitrary (all matches score equally). A ListenBrainz "popular" row (spec 6.3 #5) could fix this later; its API terms still need verifying.
 
 ### M4 · Acquisition (1 to 2 weeks)
-- `sources/jamendo.ts` (client id from `EXPO_PUBLIC_JAMENDO_CLIENT_ID` in `.env.local`, which is gitignored) and `sources/internetArchive.ts`. Store the license text for every track.
-- `downloads/manager.ts` + `worker.ts`: persistent queue, 2 concurrent transfers, resumable, progress every 500 ms, backoff retries ×3, a Wi-Fi-only switch driven by NetInfo, and a free-space check.
-- On completion, tag the file, insert the track, then fetch cover art.
-- Downloads tab: active and finished downloads, per-source storage, bulk delete. A "Get" button on Discover.
-- **Exit:** a download survives app kill and airplane-mode toggling and completes.
+- [x] `sources/internetArchive.ts`: advancedsearch limited to `mediatype:audio`, music collections and a Creative Commons `licenseurl`, most-downloaded first. Item metadata expands into one entry per song with one preferred file (VBR MP3 first), grouping FLAC/OGG/MP3 copies. Keeps MusicBrainz recording ids from `external-identifier`. Verified against the live API.
+- [x] `sources/jamendo.ts`: maps the v3.0 `tracks` endpoint and only offers tracks with `audiodownload_allowed` and a CC license. **Off until a client id is set** (`EXPO_PUBLIC_JAMENDO_CLIENT_ID` in `.env.local`, free at devportal.jamendo.com). Not yet verified live.
+- [x] `sources/license.ts`: only CC / public-domain URLs are accepted. Labels ("CC BY-NC-SA 3.0") and plain-language terms are shown before download, on finished downloads and in Now Playing.
+- [x] `downloads/manager.ts` + `schedule.ts`: persistent queue (migration v4), 2 concurrent transfers, progress to the DB every 500 ms, resumable via `DownloadTask.savable()` (survives pause, network loss and app kill), retries with 10/20/40 s backoff up to 3 attempts, Wi-Fi-only (pauses on cellular or metered networks), free-space check with a 100 MB margin.
+- [x] On completion: move into app storage, read tags, insert the track with source, license and mbid, then cover art (embedded, else the source's artwork).
+- [x] Downloads tab: free-music search, Wi-Fi-only switch, in-progress list (progress, pause/resume/retry/cancel), downloaded list (license, tap to play), per-source storage with bulk delete. "Get" on Discover albums, songs and greyed tracks. With no legal match, links out to Bandcamp, Apple Music and Spotify.
+- [x] **Exit:** a download survives app kill and airplane-mode toggling and completes. Verified on the Galaxy A32, 2026-11-20.
 
 ### M5 · Polish (1 week)
 - Playlists, queue persistence edge cases, offline banners everywhere, accessibility pass (labels, 44 pt, dynamic type), cold-start profiling (under 1.5 s with 10k tracks), Android device matrix testing (Android 10, 13+, a low-end phone).

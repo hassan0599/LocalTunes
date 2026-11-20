@@ -1,0 +1,28 @@
+{
+ "response": {
+  "numFound": 6,
+  "docs": [
+   {
+    "identifier": "nineinchnails_ghosts_I_IV",
+    "title": "Ghosts I - IV",
+    "creator": "Nine Inch Nails",
+    "licenseurl": "http://creativecommons.org/licenses/by-nc-sa/3.0/us/",
+    "downloads": 311588
+   },
+   {
+    "identifier": "NineInchNails37Ghosts38Ghosts",
+    "title": "Nine Inch Nails : 37 Ghosts & 38 Ghosts",
+    "creator": "Nine Inch Nails",
+    "licenseurl": "http://creativecommons.org/licenses/by-nc-sa/3.0/us/",
+    "downloads": 6939
+   },
+   {
+    "identifier": "37Ghosts38Ghosts",
+    "title": "37 Ghosts / 38 Ghosts",
+    "creator": "Nine Inch Nails",
+    "licenseurl": "http://creativecommons.org/licenses/by-nc-sa/3.0/",
+    "downloads": 2275
+   }
+  ]
+ }
+}

@@ -69,6 +69,19 @@ export default function MbAlbumScreen() {
                     </Text>
                   </Pressable>
                 )}
+                {owned.length < rows.length && (
+                  <Pressable
+                    onPress={() =>
+                      router.push({ pathname: '/get', params: { artist: rg.artists[0]?.name ?? rg.artistCredit, title: rg.title, album: '1' } })
+                    }
+                    style={[styles.get, { borderColor: t.accent }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Find a free, legal download of ${rg.title}`}
+                  >
+                    <Ionicons name="download-outline" size={18} color={t.accent} />
+                    <Text style={{ color: t.accent, fontWeight: '700' }}>Get</Text>
+                  </Pressable>
+                )}
                 <WishlistButton mbid={rg.id} kind="release-group" title={rg.title} artist={rg.artistCredit || null} />
               </View>
             </>
@@ -79,11 +92,17 @@ export default function MbAlbumScreen() {
           {rows.map(({ tr, match }) => (
             <Pressable
               key={`${tr.position}-${tr.recordingId}`}
-              disabled={!match}
-              onPress={() => match && playTracks(owned, owned.indexOf(match))}
+              onPress={() =>
+                match
+                  ? playTracks(owned, owned.indexOf(match))
+                  : router.push({
+                      pathname: '/get',
+                      params: { artist: rg?.artists[0]?.name ?? rg?.artistCredit ?? '', title: tr.title, mbid: tr.recordingId },
+                    })
+              }
               style={({ pressed }) => [styles.track, pressed && { backgroundColor: t.surface }]}
-              accessibilityRole={match ? 'button' : 'text'}
-              accessibilityLabel={`${tr.position}. ${tr.title}${match ? ', in your library' : ', not in your library'}`}
+              accessibilityRole="button"
+              accessibilityLabel={`${tr.position}. ${tr.title}${match ? ', in your library. Plays now.' : ', not in your library. Find a download.'}`}
             >
               <Text style={[styles.pos, { color: t.textMuted }]}>{tr.position}</Text>
               <View style={{ flex: 1, minWidth: 0 }}>
@@ -97,7 +116,7 @@ export default function MbAlbumScreen() {
           ))}
           {rows.length > 0 && owned.length < rows.length && (
             <Text style={[styles.note, { color: t.textMuted }]}>
-              Greyed-out songs aren’t in your library. Ways to get legal copies arrive with Downloads.
+              Greyed-out songs aren’t in your library. Tap one, or Get, to look for a free, legal download.
             </Text>
           )}
         </MbStatus>
@@ -111,6 +130,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '800', textAlign: 'center', marginTop: 8 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
   play: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: TOUCH, paddingHorizontal: 20, borderRadius: 22 },
+  get: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: TOUCH, paddingHorizontal: 16, borderRadius: 22, borderWidth: 1.5 },
   track: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, minHeight: 52, paddingVertical: 6 },
   pos: { width: 32, textAlign: 'right', fontVariant: ['tabular-nums'] },
   note: { fontSize: 13, padding: 16 },

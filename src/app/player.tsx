@@ -5,6 +5,7 @@ import { FlatList, StyleSheet, Text, useWindowDimensions, View } from 'react-nat
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CoverImage } from '@/components/CoverImage';
+import { LicenseChip } from '@/components/downloads/parts';
 import { IconButton } from '@/components/IconButton';
 import { useTheme } from '@/components/theme';
 import { TRACK_ROW_HEIGHT, TrackRow } from '@/components/TrackRow';
@@ -64,6 +65,7 @@ export default function PlayerScreen() {
               <Text numberOfLines={1} style={[styles.artist, { color: t.textMuted }]}>
                 {[track.artist ?? 'Unknown artist', track.album].filter(Boolean).join(' · ')}
               </Text>
+              <LicenseChip url={track.license} />
             </View>
 
             <Slider

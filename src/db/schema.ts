@@ -114,6 +114,40 @@ const MIGRATIONS: string[] = [
     added_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
   );
   `,
+
+  // v4 — M4 downloads: the v1 table was never written to; rebuild it with what the
+  // persistent queue needs (track metadata for the library insert, license, retry
+  // schedule, saved pause state for resuming after a restart).
+  `
+  DROP TABLE downloads;
+  CREATE TABLE downloads (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    source          TEXT NOT NULL,
+    source_id       TEXT NOT NULL,
+    url             TEXT NOT NULL,
+    ext             TEXT NOT NULL,
+    title           TEXT NOT NULL,
+    artist          TEXT,
+    album           TEXT,
+    track_no        INTEGER,
+    duration_ms     INTEGER,
+    license         TEXT NOT NULL,
+    artwork_url     TEXT,
+    mbid            TEXT,
+    status          TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','downloading','paused','done','failed')),
+    bytes_done      INTEGER NOT NULL DEFAULT 0,
+    bytes_total     INTEGER,
+    attempts        INTEGER NOT NULL DEFAULT 0,
+    next_attempt_at INTEGER,
+    pause_state     TEXT,
+    track_id        INTEGER REFERENCES tracks(id) ON DELETE SET NULL,
+    error           TEXT,
+    created_at      INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+    finished_at     INTEGER,
+    UNIQUE (source, source_id)
+  );
+  CREATE INDEX idx_downloads_status ON downloads(status, created_at);
+  `,
 ];
 
 export async function migrate(db: SQLiteDatabase): Promise<void> {

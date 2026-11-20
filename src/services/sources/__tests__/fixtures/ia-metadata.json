@@ -1,0 +1,215 @@
+{
+ "metadata": {
+  "identifier": "nineinchnails_ghosts_I_IV",
+  "title": "Ghosts I - IV",
+  "creator": "Nine Inch Nails",
+  "licenseurl": "http://creativecommons.org/licenses/by-nc-sa/3.0/us/",
+  "date": "2008-03-02",
+  "collection": [
+   "opensource_audio",
+   "community"
+  ]
+ },
+ "files": [
+  {
+   "name": "01_Ghosts_I.flac",
+   "source": "original",
+   "format": "Flac",
+   "title": "1 Ghosts I",
+   "creator": "Nine Inch Nails",
+   "artist": "Nine Inch Nails",
+   "album": "Ghosts I - IV",
+   "track": "01",
+   "length": "168.83",
+   "size": "12916014",
+   "external-identifier": [
+    "urn:acoustid:b198527d-a3fb-4c2c-88e7-5d4fa897f0e7",
+    "urn:mb_recording_id:b2fdf3ce-78a6-4e01-9a7b-441700e8ea66"
+   ]
+  },
+  {
+   "name": "01_Ghosts_I.mp3",
+   "source": "derivative",
+   "format": "VBR MP3",
+   "title": "1 Ghosts I",
+   "creator": "Nine Inch Nails",
+   "album": "Ghosts I - IV",
+   "track": "01",
+   "length": "02:48",
+   "size": "3801088",
+   "original": "01_Ghosts_I.flac"
+  },
+  {
+   "name": "01_Ghosts_I.ogg",
+   "source": "derivative",
+   "format": "Ogg Vorbis",
+   "length": "168.83",
+   "size": "2119552",
+   "original": "01_Ghosts_I.flac"
+  },
+  {
+   "name": "01_Ghosts_I.png",
+   "source": "derivative",
+   "format": "PNG",
+   "size": "12052",
+   "original": "01_Ghosts_I.flac"
+  },
+  {
+   "name": "01_Ghosts_I_320kb.mp3",
+   "source": "original",
+   "format": "320Kbps MP3",
+   "title": "1 Ghosts I",
+   "creator": "Nine Inch Nails",
+   "artist": "Nine Inch Nails",
+   "album": "Ghosts I-IV",
+   "track": "01",
+   "length": "168.78",
+   "size": "6754432",
+   "external-identifier": [
+    "urn:acoustid:b198527d-a3fb-4c2c-88e7-5d4fa897f0e7",
+    "urn:mb_recording_id:b2fdf3ce-78a6-4e01-9a7b-441700e8ea66"
+   ]
+  },
+  {
+   "name": "01_Ghosts_I_64kb.mp3",
+   "source": "derivative",
+   "format": "64Kbps MP3",
+   "title": "1 Ghosts I",
+   "creator": "Nine Inch Nails",
+   "album": "Ghosts I - IV",
+   "track": "01",
+   "length": "02:48",
+   "size": "1351389",
+   "original": "01_Ghosts_I.flac"
+  },
+  {
+   "name": "01_Ghosts_I_vbr.mp3",
+   "source": "derivative",
+   "format": "VBR MP3",
+   "title": "1 Ghosts I",
+   "creator": "Nine Inch Nails",
+   "album": "Ghosts I - IV",
+   "track": "01",
+   "length": "02:48",
+   "size": "3777526",
+   "original": "01_Ghosts_I.flac"
+  },
+  {
+   "name": "01_Ghosts_I_vbr.png",
+   "source": "derivative",
+   "format": "PNG",
+   "size": "11894",
+   "original": "01_Ghosts_I_vbr.mp3"
+  },
+  {
+   "name": "02_Ghosts_I.flac",
+   "source": "original",
+   "format": "Flac",
+   "title": "2 Ghosts I",
+   "creator": "Nine Inch Nails",
+   "artist": "Nine Inch Nails",
+   "album": "Ghosts I - IV",
+   "track": "02",
+   "length": "196.25",
+   "size": "15145706",
+   "external-identifier": [
+    "urn:acoustid:3dd4c7a4-1c50-495c-a532-b77e21f595f9",
+    "urn:mb_recording_id:742a5290-54ff-4dea-b2b4-ee5f0e9ea2a3"
+   ]
+  },
+  {
+   "name": "02_Ghosts_I.mp3",
+   "source": "derivative",
+   "format": "VBR MP3",
+   "title": "2 Ghosts I",
+   "creator": "Nine Inch Nails",
+   "album": "Ghosts I - IV",
+   "track": "02",
+   "length": "03:16",
+   "size": "4146176",
+   "original": "02_Ghosts_I.flac"
+  },
+  {
+   "name": "02_Ghosts_I.ogg",
+   "source": "derivative",
+   "format": "Ogg Vorbis",
+   "length": "196.25",
+   "size": "2229320",
+   "original": "02_Ghosts_I.flac"
+  },
+  {
+   "name": "02_Ghosts_I.png",
+   "source": "derivative",
+   "format": "PNG",
+   "size": "8464",
+   "original": "02_Ghosts_I.flac"
+  },
+  {
+   "name": "02_Ghosts_I_320kb.mp3",
+   "source": "original",
+   "format": "320Kbps MP3",
+   "title": "2 Ghosts I",
+   "creator": "Nine Inch Nails",
+   "artist": "Nine Inch Nails",
+   "album": "Ghosts I-IV",
+   "track": "02",
+   "length": "196.21",
+   "size": "7850112",
+   "external-identifier": [
+    "urn:acoustid:3dd4c7a4-1c50-495c-a532-b77e21f595f9",
+    "urn:mb_recording_id:742a5290-54ff-4dea-b2b4-ee5f0e9ea2a3"
+   ]
+  },
+  {
+   "name": "02_Ghosts_I_64kb.mp3",
+   "source": "derivative",
+   "format": "64Kbps MP3",
+   "title": "2 Ghosts I",
+   "creator": "Nine Inch Nails",
+   "album": "Ghosts I - IV",
+   "track": "02",
+   "length": "03:16",
+   "size": "1570608",
+   "original": "02_Ghosts_I.flac"
+  },
+  {
+   "name": "02_Ghosts_I_vbr.mp3",
+   "source": "derivative",
+   "format": "VBR MP3",
+   "title": "2 Ghosts I",
+   "creator": "Nine Inch Nails",
+   "album": "Ghosts I - IV",
+   "track": "02",
+   "length": "03:16",
+   "size": "3979777",
+   "original": "02_Ghosts_I.flac"
+  },
+  {
+   "name": "02_Ghosts_I_vbr.png",
+   "source": "derivative",
+   "format": "PNG",
+   "size": "8542",
+   "original": "02_Ghosts_I_vbr.mp3"
+  },
+  {
+   "name": "__ia_thumb.jpg",
+   "source": "original",
+   "format": "Item Tile",
+   "size": "4433"
+  },
+  {
+   "name": "cover.jpg",
+   "source": "original",
+   "format": "JPEG",
+   "title": "Frontcover",
+   "size": "318874"
+  },
+  {
+   "name": "nineinchnails_ghosts_I_IV.jpg",
+   "source": "original",
+   "format": "JPEG",
+   "title": "Frontcover",
+   "size": "23996"
+  }
+ ]
+}

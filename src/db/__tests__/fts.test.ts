@@ -54,7 +54,7 @@ describe('migrations', () => {
     await migrate(db);
     await migrate(db);
     const { user_version } = (await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))!;
-    expect(user_version).toBe(3);
+    expect(user_version).toBe(4);
   });
 });
 

@@ -6,6 +6,7 @@ import { AppState } from 'react-native';
 
 import { useTheme } from '@/components/theme';
 import { DB_NAME, migrate } from '@/db/schema';
+import { startDownloads } from '@/services/downloads/manager';
 import { scanDevice, type ScanTrigger } from '@/services/media/deviceScan';
 import { pruneCache } from '@/services/musicbrainz/cache';
 import { setupPlayback } from '@/services/playback/PlaybackService';
@@ -20,7 +21,16 @@ function Bootstrap({ children }: { children: ReactNode }) {
     setupPlayback(db).catch((e) => console.error('playback setup failed', e));
     loadWishlist(db).catch((e) => console.warn('wishlist load failed', e));
     pruneCache(db).catch((e) => console.warn('cache prune failed', e));
-    return startNetworkMonitoring();
+    const stopNetwork = startNetworkMonitoring();
+    // Download queue resumes after restarts and when the connection returns (spec 2, rule 3).
+    const stopDownloads = startDownloads(db).catch((e) => {
+      console.warn('downloads start failed', e);
+      return () => {};
+    });
+    return () => {
+      stopNetwork();
+      void stopDownloads.then((stop) => stop());
+    };
   }, [db]);
 
   // Device scan (spec 6.1): on launch, and whenever the app returns to the foreground.
@@ -62,6 +72,7 @@ export default function RootLayout() {
           <Stack.Screen name="mb-artist" options={{ title: 'Artist' }} />
           <Stack.Screen name="mb-album" options={{ title: 'Album' }} />
           <Stack.Screen name="wishlist" options={{ title: 'Wishlist' }} />
+          <Stack.Screen name="get" options={{ title: 'Get music' }} />
         </Stack>
       </Bootstrap>
     </SQLiteProvider>
