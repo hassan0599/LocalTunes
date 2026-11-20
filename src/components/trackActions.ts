@@ -2,6 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { Alert } from 'react-native';
 
 import { deleteTrack, type Track } from '@/db/queries';
+import { ignoreDeviceAsset } from '@/services/media/deviceScan';
 import { deleteOwnedFiles } from '@/services/media/importer';
 import { addToQueue, playNext, removeFromQueue } from '@/services/playback/PlaybackService';
 import { useLibraryVersion } from '@/state/library';
@@ -35,7 +36,9 @@ function confirmDelete(db: SQLiteDatabase, track: Track) {
         onPress: async () => {
           removeFromQueue(track.id);
           await deleteTrack(db, track.id);
-          if (ownsFile) deleteOwnedFiles(track.file_uri, track.artwork_uri);
+          // Only deletes files in app storage: imported audio and cover art, never device files.
+          deleteOwnedFiles(track.file_uri, track.artwork_uri);
+          if (track.device_id) await ignoreDeviceAsset(db, track.device_id);
           useLibraryVersion.getState().bump();
         },
       },

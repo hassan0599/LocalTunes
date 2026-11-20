@@ -40,10 +40,12 @@ If on-device testing shows gaps (remote next/previous, focus loss during calls),
 - **Exit:** on an Android device, import a file, play it with the screen locked, and resume after an app kill.
 
 ### M2 · Local search (1 week)
-- `services/media/deviceScan.ts`: Android MediaStore scan via expo-media-library (`granularPermissions: ["audio"]` already set). Runs on first launch, pull-to-refresh and foreground, and skips the scan when nothing has changed.
-- `db/fts.ts`: query builder (`jazz mil` → `"jazz"* "mil"*`, escape quotes), ranked by bm25 plus a recency boost.
-- Search tab with a 150 ms debounce, results grouped by songs, albums and artists.
-- **Exit:** a seeded 50k-track DB answers queries in under 50 ms on a mid-range Android phone (benchmark script).
+- [x] `services/media/deviceScan.ts`: MediaStore scan (expo-media-library `next` API). Runs on first launch (asks for permission once), on foreground and on pull-to-refresh. A signature check (count, newest mtime, ids, filter version) skips no-op scans. Diffs by MediaStore id (`tracks.device_id`, migration v2). Reads tags with the same reader as imports.
+- [x] `services/media/scanFilter.ts`: what counts as music. Requires a known duration of at least 30 s. Excludes ringtone, recording and backup folders, plus voice-note and WhatsApp file names. Deleted device tracks are remembered (`scan.ignored`).
+- [x] `db/fts.ts`: `jazz mil` → `"jazz"* AND "mil"*`. Songs rank by bm25 (title > artist > album) with a 30-day recency boost. Albums and artists use FTS column filters. FTS table has `prefix='1 2 3'`. Broad queries (more than 2,000 matches) skip bm25 and return the newest matches.
+- [x] Search tab: 150 ms debounce, stale-response guard, songs / albums / artists groups.
+- [x] Tests: tag reader, filter rules, and search SQL against real SQLite + FTS5 (`node:sqlite`, needs Node 22.5+).
+- Benchmarks are out of scope for now (owner's call, 2026-11-20). For reference: at 50k tracks, search takes about 12 ms worst case on desktop and 43–286 ms on the Galaxy A32 in a **debug** build, where SQLite is compiled unoptimized. The < 50 ms target (spec 8) is unverified on a release build.
 
 ### M3 · Discover (1 to 2 weeks)
 - `services/musicbrainz/client.ts`: serial queue with 1.1 s spacing, backoff on 503, User-Agent from `MUSICBRAINZ_USER_AGENT` in `src/config.ts`.

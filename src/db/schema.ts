@@ -84,6 +84,24 @@ const MIGRATIONS: string[] = [
     value TEXT
   );
   `,
+
+  // v2 — M2 local search + device scan.
+  // - device_id: MediaStore asset id for `source = 'device'` tracks, so rescans diff by id
+  //   without resolving every asset's URI.
+  // - tracks_fts rebuilt with prefix indexes so short type-ahead prefixes stay fast.
+  `
+  ALTER TABLE tracks ADD COLUMN device_id TEXT;
+  CREATE UNIQUE INDEX idx_tracks_device_id ON tracks(device_id) WHERE device_id IS NOT NULL;
+
+  DROP TABLE tracks_fts;
+  CREATE VIRTUAL TABLE tracks_fts USING fts5(
+    title, artist, album,
+    content='tracks', content_rowid='id',
+    tokenize='unicode61 remove_diacritics 2',
+    prefix='1 2 3'
+  );
+  INSERT INTO tracks_fts(tracks_fts) VALUES ('rebuild');
+  `,
 ];
 
 export async function migrate(db: SQLiteDatabase): Promise<void> {

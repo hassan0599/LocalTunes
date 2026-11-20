@@ -15,6 +15,7 @@ export interface Track {
   source: TrackSource;
   license: string | null;
   mbid: string | null;
+  device_id: string | null;
   added_at: number;
   last_played_at: number | null;
   play_count: number;
@@ -22,7 +23,10 @@ export interface Track {
 
 export type NewTrack = Pick<Track, 'title' | 'file_uri' | 'source'> &
   Partial<
-    Pick<Track, 'artist' | 'album' | 'album_artist' | 'track_no' | 'duration_ms' | 'artwork_uri' | 'license' | 'mbid'>
+    Pick<
+      Track,
+      'artist' | 'album' | 'album_artist' | 'track_no' | 'duration_ms' | 'artwork_uri' | 'license' | 'mbid' | 'device_id'
+    >
   >;
 
 export interface AlbumSummary {
@@ -62,9 +66,10 @@ export function getTrack(db: SQLiteDatabase, id: number): Promise<Track | null> 
 /** Returns tracks in the same order as `ids`; missing ids are dropped. */
 export async function getTracksByIds(db: SQLiteDatabase, ids: number[]): Promise<Track[]> {
   if (!ids.length) return [];
+  // json_each avoids SQLite's bound-parameter limit for very long queues.
   const rows = await db.getAllAsync<Track>(
-    `SELECT * FROM tracks WHERE id IN (${ids.map(() => '?').join(',')})`,
-    ...ids,
+    'SELECT * FROM tracks WHERE id IN (SELECT value FROM json_each(?))',
+    JSON.stringify(ids),
   );
   const byId = new Map(rows.map((r) => [r.id, r]));
   return ids.map((id) => byId.get(id)).filter((t): t is Track => !!t);
@@ -72,8 +77,8 @@ export async function getTracksByIds(db: SQLiteDatabase, ids: number[]): Promise
 
 export async function insertTrack(db: SQLiteDatabase, t: NewTrack): Promise<number> {
   const res = await db.runAsync(
-    `INSERT INTO tracks (title, artist, album, album_artist, track_no, duration_ms, file_uri, artwork_uri, source, license, mbid)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO tracks (title, artist, album, album_artist, track_no, duration_ms, file_uri, artwork_uri, source, license, mbid, device_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     t.title,
     t.artist ?? null,
     t.album ?? null,
@@ -85,8 +90,21 @@ export async function insertTrack(db: SQLiteDatabase, t: NewTrack): Promise<numb
     t.source,
     t.license ?? null,
     t.mbid ?? null,
+    t.device_id ?? null,
   );
   return res.lastInsertRowId;
+}
+
+export interface DeviceTrackRow {
+  id: number;
+  device_id: string;
+  file_uri: string;
+  artwork_uri: string | null;
+}
+
+/** Every track that came from the device scan. */
+export function listDeviceTracks(db: SQLiteDatabase): Promise<DeviceTrackRow[]> {
+  return db.getAllAsync('SELECT id, device_id, file_uri, artwork_uri FROM tracks WHERE device_id IS NOT NULL');
 }
 
 export async function setTrackArtwork(db: SQLiteDatabase, id: number, uri: string): Promise<void> {

@@ -82,7 +82,8 @@ async function importOne(db: SQLiteDatabase, picked: File, originalName: string)
   }
 }
 
-async function saveCover(db: SQLiteDatabase, trackId: number, pic: Picture): Promise<void> {
+export async function saveCover(db: SQLiteDatabase, trackId: number, pic: Picture): Promise<void> {
+  coversDir().create({ intermediates: true, idempotent: true });
   const file = new File(coversDir(), `${trackId}.${pic.mime.includes('png') ? 'png' : 'jpg'}`);
   if (file.exists) file.delete();
   file.create();
@@ -90,8 +91,11 @@ async function saveCover(db: SQLiteDatabase, trackId: number, pic: Picture): Pro
   await setTrackArtwork(db, trackId, file.uri);
 }
 
-/** Remove a track's files from app storage (only for files the app owns). */
-export function deleteOwnedFiles(fileUri: string, artworkUri: string | null): void {
+/**
+ * Remove a track's files from app storage. Only files under the app's document
+ * directory are touched, so device-owned audio files are never deleted.
+ */
+export function deleteOwnedFiles(fileUri: string | null, artworkUri: string | null): void {
   for (const uri of [fileUri, artworkUri]) {
     if (!uri || !uri.startsWith(Paths.document.uri)) continue;
     const f = new File(uri);

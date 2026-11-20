@@ -2,9 +2,21 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { CoverImage } from '@/components/CoverImage';
+import { DeviceMusicBanner } from '@/components/DeviceMusicBanner';
 import { IconButton } from '@/components/IconButton';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { TOUCH, useTheme } from '@/components/theme';
@@ -20,12 +32,16 @@ import {
   type SongSort,
   type Track,
 } from '@/db/queries';
+import { scanDevice } from '@/services/media/deviceScan';
 import { pickAndImport } from '@/services/media/importer';
 import { playTracks } from '@/services/playback/PlaybackService';
 import { useLibraryVersion } from '@/state/library';
 import { selectCurrentTrack, usePlayer } from '@/state/player';
+import { useScan } from '@/state/scan';
 
 type Section = 'songs' | 'albums' | 'artists';
+
+const LIST_HEADER_HEIGHT = 48;
 
 const SORT_NEXT: Record<SongSort, SongSort> = { title: 'artist', artist: 'added', added: 'title' };
 const SORT_LABEL: Record<SongSort, string> = { title: 'Title', artist: 'Artist', added: 'Recently added' };
@@ -83,6 +99,7 @@ export default function LibraryScreen() {
           </Pressable>
         ))}
       </View>
+      <DeviceMusicBanner />
 
       {section === 'songs' && <Songs sort={sort} onSort={() => setSort(SORT_NEXT[sort])} onImport={onImport} />}
       {section === 'albums' && <Albums />}
@@ -102,14 +119,29 @@ function Songs({ sort, onSort, onImport }: { sort: SongSort; onSort: () => void;
     [tracks],
   );
   const onLongPress = useCallback((track: Track) => showTrackActions(db, track), [db]);
+  const scanning = useScan((s) => s.scanning);
+  const [pulled, setPulled] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setPulled(true);
+    try {
+      await scanDevice(db, 'manual');
+    } finally {
+      setPulled(false);
+    }
+  }, [db]);
+  const refreshControl =
+    Platform.OS === 'android' ? (
+      <RefreshControl refreshing={pulled && scanning} onRefresh={onRefresh} colors={[t.accent]} />
+    ) : undefined;
 
   if (!loading && tracks.length === 0) {
     return (
-      <View style={styles.empty}>
+      <ScrollView contentContainerStyle={styles.empty} refreshControl={refreshControl}>
         <Ionicons name="musical-notes-outline" size={56} color={t.textMuted} />
         <Text style={[styles.emptyTitle, { color: t.text }]}>Your library is empty</Text>
         <Text style={[styles.emptyBody, { color: t.textMuted }]}>
           Import audio files you own. They are copied into localtunes and play offline.
+          {Platform.OS === 'android' ? ' Pull down to look for music already on this phone.' : ''}
         </Text>
         <Pressable
           onPress={onImport}
@@ -118,7 +150,7 @@ function Songs({ sort, onSort, onImport }: { sort: SongSort; onSort: () => void;
         >
           <Text style={{ color: t.onAccent, fontWeight: '600', fontSize: 16 }}>Import music</Text>
         </Pressable>
-      </View>
+      </ScrollView>
     );
   }
 
@@ -126,7 +158,12 @@ function Songs({ sort, onSort, onImport }: { sort: SongSort; onSort: () => void;
     <FlatList
       data={tracks}
       keyExtractor={(item) => String(item.id)}
-      getItemLayout={(_, index) => ({ length: TRACK_ROW_HEIGHT, offset: TRACK_ROW_HEIGHT * index, index })}
+      refreshControl={refreshControl}
+      getItemLayout={(_, index) => ({
+        length: TRACK_ROW_HEIGHT,
+        offset: LIST_HEADER_HEIGHT + TRACK_ROW_HEIGHT * index,
+        index,
+      })}
       ListHeaderComponent={
         <View style={styles.listHeader}>
           <Text style={{ color: t.textMuted }}>
@@ -225,9 +262,9 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   segments: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
   segment: { minHeight: 36, paddingHorizontal: 16, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  listHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 4 },
+  listHeader: { height: LIST_HEADER_HEIGHT, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16 },
   sortBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: TOUCH, paddingLeft: 8 },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
+  empty: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
   emptyTitle: { fontSize: 20, fontWeight: '700' },
   emptyBody: { textAlign: 'center', fontSize: 15 },
   cta: { marginTop: 8, paddingHorizontal: 24, minHeight: TOUCH + 4, borderRadius: 24, justifyContent: 'center' },
