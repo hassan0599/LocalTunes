@@ -48,12 +48,15 @@ If on-device testing shows gaps (remote next/previous, focus loss during calls),
 - Benchmarks are out of scope for now (owner's call, 2026-11-20). For reference: at 50k tracks, search takes about 12 ms worst case on desktop and 43–286 ms on the Galaxy A32 in a **debug** build, where SQLite is compiled unoptimized. The < 50 ms target (spec 8) is unverified on a release build.
 
 ### M3 · Discover (1 to 2 weeks)
-- `services/musicbrainz/client.ts`: serial queue with 1.1 s spacing, backoff on 503, User-Agent from `MUSICBRAINZ_USER_AGENT` in `src/config.ts`.
-- `cache.ts` over `mb_cache` (7 d entities / 24 h search), stale-while-revalidate, `OfflineBanner`.
-- Genre browse, artist page, search with type toggle, similar artists from tags and relationships.
-- Cover Art Archive images with an on-disk cache; a 404 shows the placeholder.
-- "In your library" matching (MBID first, then normalized artist and title). Wishlist.
-- **Exit:** browse, kill the network, and the pages already visited still render.
+- [x] `services/musicbrainz/client.ts`: serial queue with 1.1 s spacing and exponential backoff on 503/429 (MusicBrainz returns 503 "server busy" often, even at 1 req/s). User-Agent from `src/config.ts`. Injectable fetch/clock for tests.
+- [x] `cache.ts` over `mb_cache` (7 d entities / 24 h search). Serves fresh entries without a request, and stale ones when offline or when a refresh fails. Long-expired rows are pruned on launch. `OfflineBanner` shows "Offline, showing saved results".
+- [x] `api.ts`: search (artists, albums, songs; songs limited to official releases), genre browse (albums + artists by tag), artist page (tags, related artists, links), discography browse, similar artists (shared top tags + relationships), album tracklist (earliest official release).
+- [x] Cover Art Archive `release-group/{mbid}/front-250` downloaded to `Paths.cache/caa`, 3 in parallel. Misses are remembered for a day and show the placeholder.
+- [x] `match.ts`: MBID first, then normalized artist + title. Bracketed noise is dropped, but version qualifiers (remix, live, acoustic…) are kept, so remixes don't match the original. Collaborations are split into artists.
+- [x] Wishlist (migration v3), toggled from rows and the album page, with its own screen.
+- [x] Screens: Discover home (genres, wishlist, search with type toggle), genre, MusicBrainz artist, MusicBrainz album (play owned tracks directly), wishlist.
+- [x] **Exit:** browse, kill the network, and the pages already visited still render. Verified on the Galaxy A32 in airplane mode, 2026-11-20.
+- Known limit: MusicBrainz has no popularity data, so tag browse order is arbitrary (all matches score equally). A ListenBrainz "popular" row (spec 6.3 #5) could fix this later; its API terms still need verifying.
 
 ### M4 · Acquisition (1 to 2 weeks)
 - `sources/jamendo.ts` (client id from `EXPO_PUBLIC_JAMENDO_CLIENT_ID` in `.env.local`, which is gitignored) and `sources/internetArchive.ts`. Store the license text for every track.

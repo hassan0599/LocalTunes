@@ -1,0 +1,188 @@
+{
+ "id": "561d854a-6a28-4aa7-8c99-323e6ce46c2a",
+ "name": "Miles Davis",
+ "type": "Person",
+ "country": "US",
+ "disambiguation": "jazz trumpeter, bandleader, songwriter",
+ "life-span": {
+  "end": "1991-09-28",
+  "ended": true,
+  "begin": "1926-05-26"
+ },
+ "tags": [
+  {
+   "count": 3,
+   "name": "bebop"
+  },
+  {
+   "name": "blues",
+   "count": 1
+  },
+  {
+   "name": "classical",
+   "count": 1
+  },
+  {
+   "count": 10,
+   "name": "cool jazz"
+  },
+  {
+   "count": 1,
+   "name": "funk"
+  },
+  {
+   "name": "hard bop",
+   "count": 7
+  },
+  {
+   "count": 27,
+   "name": "jazz"
+  },
+  {
+   "name": "jazz fusion",
+   "count": 13
+  },
+  {
+   "count": 1,
+   "name": "jazz-funk"
+  },
+  {
+   "count": 11,
+   "name": "modal jazz"
+  },
+  {
+   "name": "post-bop",
+   "count": 4
+  },
+  {
+   "name": "rock",
+   "count": 1
+  }
+ ],
+ "relations": [
+  {
+   "type": "collaboration",
+   "target-type": "artist",
+   "direction": "forward",
+   "artist": {
+    "id": "298fb0c1-5a1f-43c1-854d-663762caad6e",
+    "name": "Artists United Against Apartheid"
+   }
+  },
+  {
+   "type": "member of band",
+   "target-type": "artist",
+   "direction": "forward",
+   "artist": {
+    "id": "fe7245e7-d734-4ca1-8e26-691883f58201",
+    "name": "Miles Davis Quintet"
+   }
+  },
+  {
+   "type": "member of band",
+   "target-type": "artist",
+   "direction": "forward",
+   "artist": {
+    "id": "f137837b-fa55-48d1-8c85-f13961b3ac77",
+    "name": "Miles Davis Sextet"
+   }
+  },
+  {
+   "type": "member of band",
+   "target-type": "artist",
+   "direction": "forward",
+   "artist": {
+    "id": "03606dee-b333-48fe-b9af-d671c837d40f",
+    "name": "Miles Davis Quartet"
+   }
+  },
+  {
+   "type": "member of band",
+   "target-type": "artist",
+   "direction": "forward",
+   "artist": {
+    "id": "88130878-7ee9-4ce2-b24b-1dd9da898030",
+    "name": "Miles Davis Septet"
+   }
+  },
+  {
+   "type": "member of band",
+   "target-type": "artist",
+   "direction": "forward",
+   "artist": {
+    "id": "16d2b8e6-8930-4c9e-856f-e6d096479350",
+    "name": "The Miles Davis Nonet"
+   }
+  },
+  {
+   "type": "member of band",
+   "target-type": "artist",
+   "direction": "forward",
+   "artist": {
+    "id": "e02d4f5a-8bcf-4fd3-8410-57c680389748",
+    "name": "Charlie Parker Quintet"
+   }
+  },
+  {
+   "type": "member of band",
+   "target-type": "artist",
+   "direction": "forward",
+   "artist": {
+    "id": "c52ff92e-b338-4815-bd63-4e9b89795e84",
+    "name": "Miles Davis and His Orchestra"
+   }
+  },
+  {
+   "type": "member of band",
+   "target-type": "artist",
+   "direction": "forward",
+   "artist": {
+    "id": "607d7275-2b92-49e5-a7ee-32f9cc29b076",
+    "name": "Miles Davis All Stars"
+   }
+  },
+  {
+   "type": "member of band",
+   "target-type": "artist",
+   "direction": "forward",
+   "artist": {
+    "id": "5464e03d-32be-4e9a-bf74-2567f560df6f",
+    "name": "Miles Davis Group"
+   }
+  },
+  {
+   "type": "member of band",
+   "target-type": "artist",
+   "direction": "forward",
+   "artist": {
+    "id": "55920730-831f-431f-80f7-539a2bf83f98",
+    "name": "Miles Davis and His Band"
+   }
+  },
+  {
+   "type": "member of band",
+   "target-type": "artist",
+   "direction": "forward",
+   "artist": {
+    "id": "8d63d8f8-e743-48af-b45e-5d9639edcd1b",
+    "name": "Charlie Parker Septet"
+   }
+  },
+  {
+   "type": "allmusic",
+   "target-type": "url",
+   "direction": "forward",
+   "url": {
+    "resource": "https://www.allmusic.com/artist/mn0000423829"
+   }
+  },
+  {
+   "type": "bandcamp",
+   "target-type": "url",
+   "direction": "forward",
+   "url": {
+    "resource": "https://milesdavis.bandcamp.com/"
+   }
+  }
+ ]
+}

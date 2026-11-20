@@ -102,6 +102,18 @@ const MIGRATIONS: string[] = [
   );
   INSERT INTO tracks_fts(tracks_fts) VALUES ('rebuild');
   `,
+
+  // v3 — M3 Discover: wishlist of discovered songs and albums with no playable source
+  // yet (spec 10, "Discover without audio").
+  `
+  CREATE TABLE wishlist (
+    mbid     TEXT PRIMARY KEY,
+    kind     TEXT NOT NULL CHECK (kind IN ('recording', 'release-group')),
+    title    TEXT NOT NULL,
+    artist   TEXT,
+    added_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+  );
+  `,
 ];
 
 export async function migrate(db: SQLiteDatabase): Promise<void> {

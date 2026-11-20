@@ -7,14 +7,21 @@ import { AppState } from 'react-native';
 import { useTheme } from '@/components/theme';
 import { DB_NAME, migrate } from '@/db/schema';
 import { scanDevice, type ScanTrigger } from '@/services/media/deviceScan';
+import { pruneCache } from '@/services/musicbrainz/cache';
 import { setupPlayback } from '@/services/playback/PlaybackService';
+import { startNetworkMonitoring } from '@/state/network';
+import { loadWishlist } from '@/state/wishlist';
 
-function PlaybackBootstrap({ children }: { children: ReactNode }) {
+/** App-wide services that need the database: playback, device scan, network, wishlist. */
+function Bootstrap({ children }: { children: ReactNode }) {
   const db = useSQLiteContext();
+
   useEffect(() => {
     setupPlayback(db).catch((e) => console.error('playback setup failed', e));
+    loadWishlist(db).catch((e) => console.warn('wishlist load failed', e));
+    pruneCache(db).catch((e) => console.warn('cache prune failed', e));
+    return startNetworkMonitoring();
   }, [db]);
-
 
   // Device scan (spec 6.1): on launch, and whenever the app returns to the foreground.
   // Unchanged MediaStore contents make the foreground scan a cheap no-op.
@@ -30,6 +37,7 @@ function PlaybackBootstrap({ children }: { children: ReactNode }) {
     });
     return () => sub.remove();
   }, [db]);
+
   return children;
 }
 
@@ -37,7 +45,7 @@ export default function RootLayout() {
   const t = useTheme();
   return (
     <SQLiteProvider databaseName={DB_NAME} onInit={migrate}>
-      <PlaybackBootstrap>
+      <Bootstrap>
         <StatusBar style="auto" />
         <Stack
           screenOptions={{
@@ -50,8 +58,12 @@ export default function RootLayout() {
           <Stack.Screen name="player" options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen name="album" options={{ title: 'Album' }} />
           <Stack.Screen name="artist" options={{ title: 'Artist' }} />
+          <Stack.Screen name="genre" options={{ title: 'Genre' }} />
+          <Stack.Screen name="mb-artist" options={{ title: 'Artist' }} />
+          <Stack.Screen name="mb-album" options={{ title: 'Album' }} />
+          <Stack.Screen name="wishlist" options={{ title: 'Wishlist' }} />
         </Stack>
-      </PlaybackBootstrap>
+      </Bootstrap>
     </SQLiteProvider>
   );
 }

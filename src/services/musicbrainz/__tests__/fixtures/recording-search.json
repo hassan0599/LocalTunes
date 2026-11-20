@@ -1,0 +1,99 @@
+{
+ "count": 1,
+ "recordings": [
+  {
+   "id": "15aa06dc-b7f4-41cc-9529-c8615a97eb5c",
+   "title": "So What",
+   "length": 652200,
+   "artist-credit": [
+    {
+     "name": "Miles Davis",
+     "artist": {
+      "id": "561d854a-6a28-4aa7-8c99-323e6ce46c2a",
+      "name": "Miles Davis"
+     }
+    }
+   ],
+   "releases": [
+    {
+     "id": "18d46047-850d-4c73-80fa-1defc0c517b0",
+     "title": "Round Midnight",
+     "status": "Official",
+     "release-group": {
+      "id": "9903de67-6211-426d-b049-6c96abe40cde",
+      "title": "Round Midnight",
+      "primary-type": "Album",
+      "secondary-types": [
+       "Compilation"
+      ]
+     }
+    },
+    {
+     "id": "44d88bd3-16a9-45a0-9cb1-93e209b1ee0d",
+     "title": "Autumn Leaves",
+     "status": "Official",
+     "release-group": {
+      "id": "5e9aaaf6-34c2-4263-9938-325a2f94a980",
+      "title": "Round Midnight",
+      "primary-type": "Album",
+      "secondary-types": [
+       "Live"
+      ]
+     }
+    },
+    {
+     "id": "9d359945-f0fc-4027-b73c-b6a62a12ae75",
+     "title": "Grandes Maestros del Jazz 11",
+     "status": "Promotion",
+     "release-group": {
+      "id": "6ef9e21d-ff8b-4963-905a-09cc8929cbe0",
+      "title": "Grandes Maestros del Jazz 11",
+      "primary-type": "Album",
+      "secondary-types": [
+       "Compilation"
+      ]
+     }
+    },
+    {
+     "id": "541c5447-0fb5-4297-a011-15567c4ecc71",
+     "title": "Jazz Masters",
+     "status": "Official",
+     "release-group": {
+      "id": "9e3df23c-3000-463c-b408-c43bd26bd862",
+      "title": "Jazz Masters",
+      "primary-type": "Album",
+      "secondary-types": [
+       "Compilation"
+      ]
+     }
+    },
+    {
+     "id": "4daa3f3b-0eb3-4886-baca-1ca23ae4d8bb",
+     "title": "Walkin' With Miles",
+     "status": "Official",
+     "release-group": {
+      "id": "5e9aaaf6-34c2-4263-9938-325a2f94a980",
+      "title": "Round Midnight",
+      "primary-type": "Album",
+      "secondary-types": [
+       "Live"
+      ]
+     }
+    },
+    {
+     "id": "80380853-57ee-4b67-85e0-522eb040a7ab",
+     "title": "Golden Jazz Box - The Six Best Albums From the Six Best Jazzmen",
+     "status": "Official",
+     "release-group": {
+      "id": "ab81094c-9729-4da3-a9b4-a1b21322947d",
+      "title": "Golden Jazz Box - The Six Best Albums From the Six Best Jazzmen",
+      "primary-type": "Album",
+      "secondary-types": [
+       "Compilation"
+      ]
+     }
+    }
+   ]
+  }
+ ]
+}
