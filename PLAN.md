@@ -31,7 +31,7 @@ Whatever wins sits behind a `PlaybackService` interface in `src/services/playbac
 - Library tab: songs, albums and artists lists (FlashList if 10k rows lag), long-press actions.
 - MiniPlayer above the tab bar; Now Playing modal.
 - Add `jest-expo` for logic tests.
-- **Exit:** import a file on both platforms, play it with the screen locked, and resume after an app kill.
+- **Exit:** on an Android device, import a file, play it with the screen locked, and resume after an app kill.
 
 ### M2 · Local search (1 week)
 - `services/media/deviceScan.ts`: Android MediaStore scan via expo-media-library (`granularPermissions: ["audio"]` already set). Runs on first launch, pull-to-refresh and foreground, and skips the scan when nothing has changed.
@@ -40,7 +40,7 @@ Whatever wins sits behind a `PlaybackService` interface in `src/services/playbac
 - **Exit:** a seeded 50k-track DB answers queries in under 50 ms on a mid-range Android phone (benchmark script).
 
 ### M3 · Discover (1 to 2 weeks)
-- `services/musicbrainz/client.ts`: serial queue with 1.1 s spacing, backoff on 503, User-Agent `localtunes/<version> ( <contact> )`.
+- `services/musicbrainz/client.ts`: serial queue with 1.1 s spacing, backoff on 503, User-Agent from `MUSICBRAINZ_USER_AGENT` in `src/config.ts`.
 - `cache.ts` over `mb_cache` (7 d entities / 24 h search), stale-while-revalidate, `OfflineBanner`.
 - Genre browse, artist page, search with type toggle, similar artists from tags and relationships.
 - Cover Art Archive images with an on-disk cache; a 404 shows the placeholder.
@@ -55,13 +55,13 @@ Whatever wins sits behind a `PlaybackService` interface in `src/services/playbac
 - **Exit:** a download survives app kill and airplane-mode toggling and completes.
 
 ### M5 · Polish (1 week)
-- Playlists, queue persistence edge cases, offline banners everywhere, accessibility pass (labels, 44 pt, dynamic type), cold-start profiling (under 1.5 s with 10k tracks), device matrix testing.
+- Playlists, queue persistence edge cases, offline banners everywhere, accessibility pass (labels, 44 pt, dynamic type), cold-start profiling (under 1.5 s with 10k tracks), Android device matrix testing (Android 10, 13+, a low-end phone).
 
-## Open decisions for the owner
-1. **Platform scope:** should v1 ship Android-first, since iOS is import-only?
-2. **MusicBrainz contact** for the User-Agent: an email or URL MusicBrainz can reach.
-3. **License** for this repo.
-4. **Bundle id:** set to `com.localtunes.app` as a placeholder. Change it before the first store build.
+## Decisions
+1. **Platform scope:** v1 ships **Android first**. Keep code cross-platform (no Android-only APIs outside `services/media/deviceScan.ts`), but test, tune and release on Android only. iOS (import-only) follows after v1.
+2. **MusicBrainz contact:** `developer.mha@gmail.com`, set in `src/config.ts`.
+3. **License:** MIT (`LICENSE`).
+4. **Open: bundle id.** Set to `com.localtunes.app` as a placeholder. Change it before the first Play Store build.
 
 ## Commands
 ```bash

@@ -33,5 +33,6 @@
     "lint": "expo lint",
     "doctor": "npx expo-doctor"
   },
-  "private": true
+  "private": true,
+  "license": "MIT"
 }
