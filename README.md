@@ -47,8 +47,6 @@ src/
   state/          player.ts, library.ts, network.ts, downloads.ts, wishlist.ts, scan.ts
 ```
 
-See [`PLAN.md`](./PLAN.md) for the build plan and milestone notes, and [`Offline-First Music Player Technical Spec.md`](./Offline-First%20Music%20Player%20Technical%20Spec.md) for the original spec.
-
 ## Getting started
 
 ### Prerequisites
