@@ -139,7 +139,7 @@ export default function GetScreen() {
         ))}
         {disabled.length > 0 && (
           <Text style={[styles.note, { color: t.textMuted }]}>
-            {disabled.map((s) => s.name).join(', ')} is off: it needs an API key (see PLAN.md).
+            {disabled.map((s) => s.name).join(', ')} is off: it needs an API key (see README.md).
           </Text>
         )}
       </ScrollView>
