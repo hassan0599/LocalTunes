@@ -7,6 +7,7 @@ import { AppState } from 'react-native';
 import { SheetHost } from '@/components/Sheet';
 import { useTheme } from '@/components/theme';
 import { DB_NAME, migrate } from '@/db/schema';
+import { installCrashRecorder, showLastCrashIfAny } from '@/services/crashLog';
 import { startDownloads } from '@/services/downloads/manager';
 import { scanDevice, type ScanTrigger } from '@/services/media/deviceScan';
 import { backfillGenres } from '@/services/media/genreBackfill';
@@ -15,11 +16,15 @@ import { setupPlayback } from '@/services/playback/PlaybackService';
 import { startNetworkMonitoring } from '@/state/network';
 import { loadWishlist } from '@/state/wishlist';
 
+// Install before anything else runs so even early fatal errors are recorded.
+installCrashRecorder();
+
 /** App-wide services that need the database: playback, device scan, network, wishlist. */
 function Bootstrap({ children }: { children: ReactNode }) {
   const db = useSQLiteContext();
 
   useEffect(() => {
+    showLastCrashIfAny();
     setupPlayback(db).catch((e) => console.error('playback setup failed', e));
     loadWishlist(db).catch((e) => console.warn('wishlist load failed', e));
     pruneCache(db).catch((e) => console.warn('cache prune failed', e));
