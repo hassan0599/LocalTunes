@@ -17,6 +17,9 @@ import {
 
 import { CoverImage } from '@/components/CoverImage';
 import { DeviceMusicBanner } from '@/components/DeviceMusicBanner';
+import { parseCovers, PlaylistCover } from '@/components/PlaylistCover';
+import { showPrompt } from '@/components/Sheet';
+import { createPlaylist, listPlaylists, type PlaylistSummary } from '@/db/playlists';
 import { IconButton } from '@/components/IconButton';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { TOUCH, useTheme } from '@/components/theme';
@@ -39,7 +42,7 @@ import { useLibraryVersion } from '@/state/library';
 import { selectCurrentTrack, usePlayer } from '@/state/player';
 import { useScan } from '@/state/scan';
 
-type Section = 'songs' | 'albums' | 'artists';
+type Section = 'songs' | 'playlists' | 'albums' | 'artists';
 
 const LIST_HEADER_HEIGHT = 48;
 
@@ -84,8 +87,14 @@ export default function LibraryScreen() {
           )
         }
       />
-      <View style={styles.segments} accessibilityRole="tablist">
-        {(['songs', 'albums', 'artists'] as const).map((s) => (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ flexGrow: 0 }}
+        contentContainerStyle={styles.segments}
+        accessibilityRole="tablist"
+      >
+        {(['songs', 'playlists', 'albums', 'artists'] as const).map((s) => (
           <Pressable
             key={s}
             onPress={() => setSection(s)}
@@ -98,12 +107,13 @@ export default function LibraryScreen() {
             </Text>
           </Pressable>
         ))}
-      </View>
+      </ScrollView>
       <DeviceMusicBanner />
 
       {section === 'songs' && <Songs sort={sort} onSort={() => setSort(SORT_NEXT[sort])} onImport={onImport} />}
       {section === 'albums' && <Albums />}
       {section === 'artists' && <Artists />}
+      {section === 'playlists' && <Playlists />}
     </View>
   );
 }
@@ -226,6 +236,59 @@ function AlbumCover({ uri, seed }: { uri: string | null; seed: string }) {
   );
 }
 
+function Playlists() {
+  const t = useTheme();
+  const db = useSQLiteContext();
+  const { data } = useLibraryQuery(listPlaylists, [], [] as PlaylistSummary[]);
+  const create = () =>
+    showPrompt({
+      title: "Give your playlist a name",
+      placeholder: "My playlist",
+      confirmLabel: "Create",
+      onSubmit: async (name) => {
+        const id = await createPlaylist(db, name);
+        useLibraryVersion.getState().bump();
+        router.push({ pathname: "/playlist", params: { id: String(id) } });
+      },
+    });
+  return (
+    <FlatList
+      data={data}
+      keyExtractor={(p) => String(p.id)}
+      ListHeaderComponent={
+        <Pressable
+          style={({ pressed }) => [styles.artistRow, pressed && { backgroundColor: t.surface }]}
+          onPress={create}
+          accessibilityRole="button"
+        >
+          <View style={[styles.newPlaylist, { backgroundColor: t.elevated }]}>
+            <Ionicons name="add" size={30} color={t.text} />
+          </View>
+          <Text style={{ color: t.text, fontSize: 16, fontWeight: "600" }}>New playlist</Text>
+        </Pressable>
+      }
+      renderItem={({ item }) => (
+        <Pressable
+          style={({ pressed }) => [styles.artistRow, pressed && { backgroundColor: t.surface }]}
+          onPress={() => router.push({ pathname: "/playlist", params: { id: String(item.id) } })}
+          accessibilityRole="button"
+          accessibilityLabel={`Playlist ${item.name}, ${item.track_count} songs`}
+        >
+          <PlaylistCover covers={parseCovers(item.covers)} size={56} />
+          <View style={{ flex: 1 }}>
+            <Text numberOfLines={1} style={{ color: t.text, fontSize: 16, fontWeight: "600" }}>
+              {item.name}
+            </Text>
+            <Text style={{ color: t.textMuted, fontSize: 13 }}>
+              Playlist · {item.track_count} {item.track_count === 1 ? "song" : "songs"}
+            </Text>
+          </View>
+        </Pressable>
+      )}
+    />
+  );
+}
+
 function Artists() {
   const t = useTheme();
   const { data } = useLibraryQuery(listArtists, [], [] as ArtistSummary[]);
@@ -241,7 +304,7 @@ function Artists() {
           accessibilityRole="button"
           accessibilityLabel={`${item.artist}, ${item.track_count} songs`}
         >
-          <CoverImage uri={null} seed={item.artist} size={44} />
+          <CoverImage uri={null} seed={item.artist} size={48} round />
           <View style={{ flex: 1 }}>
             <Text numberOfLines={1} style={{ color: t.text, fontSize: 16, fontWeight: '500' }}>
               {item.artist}
@@ -259,6 +322,7 @@ function Artists() {
 }
 
 const styles = StyleSheet.create({
+  newPlaylist: { width: 56, height: 56, borderRadius: 4, alignItems: "center", justifyContent: "center" },
   screen: { flex: 1 },
   segments: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
   segment: { minHeight: 36, paddingHorizontal: 16, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },

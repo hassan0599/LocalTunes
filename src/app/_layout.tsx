@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 
+import { SheetHost } from '@/components/Sheet';
 import { useTheme } from '@/components/theme';
 import { DB_NAME, migrate } from '@/db/schema';
 import { startDownloads } from '@/services/downloads/manager';
@@ -56,7 +57,7 @@ export default function RootLayout() {
   return (
     <SQLiteProvider databaseName={DB_NAME} onInit={migrate}>
       <Bootstrap>
-        <StatusBar style="auto" />
+        <StatusBar style="light" />
         <Stack
           screenOptions={{
             headerStyle: { backgroundColor: t.bg },
@@ -73,7 +74,9 @@ export default function RootLayout() {
           <Stack.Screen name="mb-album" options={{ title: 'Album' }} />
           <Stack.Screen name="wishlist" options={{ title: 'Wishlist' }} />
           <Stack.Screen name="get" options={{ title: 'Get music' }} />
+          <Stack.Screen name="playlist" options={{ title: 'Playlist' }} />
         </Stack>
+        <SheetHost />
       </Bootstrap>
     </SQLiteProvider>
   );

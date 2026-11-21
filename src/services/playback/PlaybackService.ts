@@ -15,6 +15,7 @@ import {
   type AudioPlaylist,
   type AudioPlaylistStatus,
 } from 'expo-audio';
+import { File } from 'expo-file-system';
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import {
@@ -185,6 +186,13 @@ export function playTracks(tracks: Track[], startIndex = 0) {
   void persistQueue();
 }
 
+/** "Shuffle play": turn shuffle on and start from a random track. */
+export function playTracksShuffled(tracks: Track[]) {
+  if (!tracks.length) return;
+  set({ shuffle: true });
+  playTracks(tracks, Math.floor(Math.random() * tracks.length));
+}
+
 export function playNext(track: Track) {
   const p = requirePlaylist();
   const { queue, originalQueue, index } = get();
@@ -334,8 +342,16 @@ async function restoreQueue() {
   const saved = await getSetting<PersistedQueue>(db, QUEUE_KEY);
   if (!saved) return;
   const p = requirePlaylist();
-  const queue = await getTracksByIds(db, saved.trackIds);
-  const originalQueue = await getTracksByIds(db, saved.originalIds);
+  // Files can vanish between launches (deleted outside the app, SD card removed): skip them.
+  const playable = (t: Track) => {
+    try {
+      return new File(t.file_uri).exists;
+    } catch {
+      return false;
+    }
+  };
+  const queue = (await getTracksByIds(db, saved.trackIds)).filter(playable);
+  const originalQueue = (await getTracksByIds(db, saved.originalIds)).filter(playable);
   p.loop = toLoopMode(saved.repeat);
   set({ repeat: saved.repeat, shuffle: saved.shuffle });
   if (!queue.length) return;

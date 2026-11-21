@@ -46,7 +46,13 @@ export default function DownloadsScreen() {
             <Text style={{ color: t.text, fontSize: 16 }}>Wi-Fi only</Text>
             <Text style={{ color: t.textMuted, fontSize: 12 }}>Pause downloads on mobile data and metered networks</Text>
           </View>
-          <Switch value={wifiOnly} onValueChange={(v) => void setWifiOnly(v)} accessibilityLabel="Download on Wi-Fi only" />
+          <Switch
+            value={wifiOnly}
+            onValueChange={(v) => void setWifiOnly(v)}
+            trackColor={{ true: t.accent, false: t.elevated }}
+            thumbColor="#FFFFFF"
+            accessibilityLabel="Download on Wi-Fi only"
+          />
         </View>
 
         {blocked && activeRows.some((r) => r.status === 'queued') && (

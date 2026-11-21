@@ -1,37 +1,31 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image, StyleSheet, View } from 'react-native';
 
+import { tileColor } from './theme';
+
 /**
  * Cover art (spec 6.2): embedded/cached art if present, otherwise a generated
- * placeholder whose colour is derived from the album or title.
+ * placeholder whose colour is derived from the album or title. `round` for artists.
  */
-export function CoverImage({ uri, seed, size }: { uri: string | null | undefined; seed: string; size: number }) {
-  const radius = Math.max(4, size * 0.08);
+export function CoverImage({ uri, seed, size, round }: { uri: string | null | undefined; seed: string; size: number; round?: boolean }) {
+  const radius = round ? size / 2 : Math.max(4, size * 0.04);
   if (uri) {
     return (
       <Image
         source={{ uri }}
-        style={{ width: size, height: size, borderRadius: radius }}
+        style={{ width: size, height: size, borderRadius: radius, backgroundColor: '#282828' }}
         accessibilityIgnoresInvertColors
       />
     );
   }
-  const hue = hash(seed) % 360;
   return (
-    <View
-      style={[styles.placeholder, { width: size, height: size, borderRadius: radius, backgroundColor: `hsl(${hue}, 45%, 42%)` }]}
-    >
-      <Ionicons name="musical-notes" size={size * 0.45} color="rgba(255,255,255,0.85)" />
+    <View style={[styles.placeholder, { width: size, height: size, borderRadius: radius, backgroundColor: '#282828' }]}>
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: tileColor(seed), opacity: 0.35, borderRadius: radius }]} />
+      <Ionicons name={round ? 'person' : 'musical-notes'} size={size * 0.42} color="rgba(255,255,255,0.75)" />
     </View>
   );
 }
 
-function hash(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
-}
-
 const styles = StyleSheet.create({
-  placeholder: { alignItems: 'center', justifyContent: 'center' },
+  placeholder: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
 });

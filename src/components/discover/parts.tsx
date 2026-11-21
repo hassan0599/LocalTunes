@@ -15,7 +15,7 @@ import { toggleWishlist, useWishlist, type WishKind } from '@/state/wishlist';
 
 import { CoverImage } from '../CoverImage';
 import { IconButton } from '../IconButton';
-import { TOUCH, useTheme } from '../theme';
+import { TOUCH, tileColor, useTheme } from '../theme';
 import { useCoverArt, type MbState } from './hooks';
 
 // ---------------------------------------------------------------- status
@@ -140,7 +140,7 @@ export function ArtistRow({ artist, inLibrary }: { artist: Pick<MbArtist, 'id' |
       accessibilityRole="button"
       accessibilityLabel={`Artist ${artist.name}${sub ? `, ${sub}` : ''}`}
     >
-      <CoverImage uri={null} seed={artist.name} size={52} />
+      <CoverImage uri={null} seed={artist.name} size={52} round />
       <View style={styles.rowText}>
         <Text numberOfLines={1} style={[styles.title, { color: t.text }]}>
           {artist.name}
@@ -212,6 +212,23 @@ export function SectionTitle({ children }: { children: ReactNode }) {
   );
 }
 
+/** Colourful "browse" tile for a genre. */
+export function GenreTile({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.tile, { backgroundColor: tileColor(label), opacity: pressed ? 0.8 : 1 }]}
+      accessibilityRole="button"
+      accessibilityLabel={`Browse ${label}`}
+    >
+      <Text style={styles.tileText} numberOfLines={2}>
+        {label.replace(/(^|\s)\S/g, (c) => c.toUpperCase())}
+      </Text>
+      <View style={styles.tileShape} />
+    </Pressable>
+  );
+}
+
 export function Chip({ label, onPress }: { label: string; onPress: () => void }) {
   const t = useTheme();
   return (
@@ -252,4 +269,16 @@ const styles = StyleSheet.create({
   sub: { fontSize: 13, marginTop: 2 },
   section: { fontSize: 18, fontWeight: '700', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 6 },
   chip: { paddingHorizontal: 14, minHeight: 40, borderRadius: 20, justifyContent: 'center' },
+  tile: { flexBasis: '47%', flexGrow: 1, height: 96, borderRadius: 8, padding: 12, overflow: 'hidden' },
+  tileText: { color: '#fff', fontSize: 17, fontWeight: '800', maxWidth: '75%' },
+  tileShape: {
+    position: 'absolute',
+    right: -18,
+    bottom: -18,
+    width: 72,
+    height: 72,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.22)',
+    transform: [{ rotate: '25deg' }],
+  },
 });

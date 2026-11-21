@@ -5,6 +5,7 @@ import { FlatList, StyleSheet, Text, useWindowDimensions, View } from 'react-nat
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CoverImage } from '@/components/CoverImage';
+import { HeroGradient } from '@/components/ScreenHeader';
 import { LicenseChip } from '@/components/downloads/parts';
 import { IconButton } from '@/components/IconButton';
 import { useTheme } from '@/components/theme';
@@ -46,6 +47,7 @@ export default function PlayerScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: t.bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <HeroGradient height={700} color={t.heroTop} />
       <View style={styles.topBar}>
         <IconButton icon="chevron-down" label="Close player" onPress={() => router.back()} size={28} />
         <Text style={[styles.topLabel, { color: t.textMuted }]}>Now Playing</Text>
@@ -73,9 +75,9 @@ export default function PlayerScreen() {
               minimumValue={0}
               maximumValue={Math.max(total, 0.1)}
               value={Math.min(shown, total || 0)}
-              minimumTrackTintColor={t.accent}
-              maximumTrackTintColor={t.border}
-              thumbTintColor={t.accent}
+              minimumTrackTintColor={t.text}
+              maximumTrackTintColor={"rgba(255,255,255,0.25)"}
+              thumbTintColor={t.text}
               onSlidingStart={(v) => setScrubbing(v)}
               onValueChange={(v) => scrubbing !== null && setScrubbing(v)}
               onSlidingComplete={async (v) => {
@@ -103,9 +105,9 @@ export default function PlayerScreen() {
                 icon={isPlaying ? 'pause' : 'play'}
                 label={isPlaying ? 'Pause' : 'Play'}
                 size={36}
-                color={t.onAccent}
+                color="#000"
                 onPress={togglePlay}
-                style={[styles.playBtn, { backgroundColor: t.accent }]}
+                style={[styles.playBtn, { backgroundColor: t.text }]}
               />
               <IconButton icon="play-skip-forward" label="Next song" size={32} onPress={skipToNext} disabled={!hasNext} />
               <IconButton

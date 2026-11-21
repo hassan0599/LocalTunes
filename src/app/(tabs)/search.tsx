@@ -93,21 +93,21 @@ export default function SearchScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: t.bg }]}>
       <ScreenHeader title="Search" />
-      <View style={[styles.inputWrap, { backgroundColor: t.surface }]}>
-        <Ionicons name="search" size={18} color={t.textMuted} />
+      <View style={[styles.inputWrap, { backgroundColor: "#FFFFFF" }]}>
+        <Ionicons name="search" size={22} color="#121212" />
         <TextInput
           value={query}
           onChangeText={setQuery}
           placeholder="Songs, albums, artists"
-          placeholderTextColor={t.textMuted}
-          style={[styles.input, { color: t.text }]}
+          placeholderTextColor="#535353"
+          style={[styles.input, { color: "#121212", fontWeight: "600" }]}
           autoCorrect={false}
           autoCapitalize="none"
           returnKeyType="search"
           clearButtonMode="never"
           accessibilityLabel="Search your library"
         />
-        {hasQuery && <IconButton icon="close-circle" label="Clear search" color={t.textMuted} size={20} onPress={() => setQuery('')} />}
+        {hasQuery && <IconButton icon="close-circle" label="Clear search" color="#535353" size={20} onPress={() => setQuery('')} />}
       </View>
 
       {!hasQuery ? (
@@ -205,7 +205,7 @@ function ArtistRow({ artist }: { artist: ArtistSummary }) {
       accessibilityRole="button"
       accessibilityLabel={`Artist ${artist.artist}, ${artist.track_count} songs`}
     >
-      <CoverImage uri={null} seed={artist.artist} size={44} />
+      <CoverImage uri={null} seed={artist.artist} size={48} round />
       <View style={styles.rowText}>
         <Text numberOfLines={1} style={[styles.rowTitle, { color: t.text }]}>
           {artist.artist}

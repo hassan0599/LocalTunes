@@ -6,7 +6,7 @@ import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } fr
 import { useDebounced, useLibraryMatcher, useMb } from '@/components/discover/hooks';
 import {
   ArtistRow,
-  Chip,
+  GenreTile,
   MbStatus,
   OfflineBanner,
   RecordingRow,
@@ -95,7 +95,7 @@ function Home() {
       <SectionTitle>Browse by genre</SectionTitle>
       <View style={styles.chips}>
         {GENRES.map((g) => (
-          <Chip key={g} label={g} onPress={() => router.push({ pathname: '/genre', params: { tag: g } })} />
+          <GenreTile key={g} label={g} onPress={() => router.push({ pathname: '/genre', params: { tag: g } })} />
         ))}
       </View>
       <Text style={[styles.note, { color: t.textMuted }]}>
@@ -145,6 +145,6 @@ const styles = StyleSheet.create({
   kinds: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
   kind: { minHeight: 36, paddingHorizontal: 16, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   wishRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, paddingHorizontal: 14, minHeight: 52, borderRadius: 12 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 16 },
   note: { fontSize: 13, paddingHorizontal: 16, paddingVertical: 24 },
 });

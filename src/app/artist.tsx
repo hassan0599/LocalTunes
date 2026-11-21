@@ -1,46 +1,30 @@
 import { useLocalSearchParams } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSQLiteContext } from 'expo-sqlite';
 
-import { TOUCH, useTheme } from '@/components/theme';
-import { TrackListScreen } from '@/components/TrackListScreen';
+import { CoverImage } from '@/components/CoverImage';
+import { pickPlaylist } from '@/components/trackActions';
+import { HeaderIconButton, TrackListScreen } from '@/components/TrackListScreen';
 import { useLibraryQuery } from '@/components/useLibraryQuery';
 import { listArtistTracks, type Track } from '@/db/queries';
-import { playTracks } from '@/services/playback/PlaybackService';
 
 export default function ArtistScreen() {
-  const t = useTheme();
+  const db = useSQLiteContext();
   const { name = '' } = useLocalSearchParams<{ name: string }>();
-  const { data: tracks } = useLibraryQuery((db) => listArtistTracks(db, name), [name], [] as Track[]);
+  const { data: tracks } = useLibraryQuery((d) => listArtistTracks(d, name), [name], [] as Track[]);
 
   return (
     <TrackListScreen
       title={name}
+      subtitle="Artist"
       tracks={tracks}
-      header={
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: t.text }]} accessibilityRole="header">
-            {name}
-          </Text>
-          <Text style={{ color: t.textMuted }}>
-            {tracks.length} {tracks.length === 1 ? 'song' : 'songs'}
-          </Text>
-          <Pressable
-            onPress={() => playTracks(tracks, 0)}
-            disabled={!tracks.length}
-            style={[styles.play, { backgroundColor: t.accent }]}
-            accessibilityRole="button"
-            accessibilityLabel={`Play all songs by ${name}`}
-          >
-            <Text style={{ color: t.onAccent, fontWeight: '600' }}>Play all</Text>
-          </Pressable>
-        </View>
+      art={<CoverImage uri={null} seed={name} size={180} round />}
+      actions={
+        <HeaderIconButton
+          icon="add-circle-outline"
+          label={`Add all songs by ${name} to a playlist`}
+          onPress={() => void pickPlaylist(db, tracks.map((t) => t.id), name)}
+        />
       }
     />
   );
 }
-
-const styles = StyleSheet.create({
-  header: { padding: 16, gap: 6 },
-  title: { fontSize: 26, fontWeight: '700' },
-  play: { alignSelf: 'flex-start', marginTop: 8, minHeight: TOUCH, paddingHorizontal: 32, borderRadius: 22, justifyContent: 'center' },
-});

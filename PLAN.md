@@ -68,7 +68,14 @@ If on-device testing shows gaps (remote next/previous, focus loss during calls),
 - [x] **Exit:** a download survives app kill and airplane-mode toggling and completes. Verified on the Galaxy A32, 2026-11-20.
 
 ### M5 · Polish (1 week)
-- Playlists, queue persistence edge cases, offline banners everywhere, accessibility pass (labels, 44 pt, dynamic type), cold-start profiling (under 1.5 s with 10k tracks), Android device matrix testing (Android 10, 13+, a low-end phone).
+- [x] **Brand:** the owner's logo (`design/logo/logo.svg`: red open ring and light dot on #14161B) rendered to the app icon, Android adaptive foreground, background and monochrome, splash and favicon. Regenerate icons from the SVG if it changes.
+- [x] **Theme:** dark-only, in the style of popular streaming apps but with the logo red (#E5484D) instead of green. Near-black surfaces, bold white type, pill chips, red-wash header gradients (`expo-linear-gradient`), a floating mini player card, black tab bar, colourful genre tiles, round artist avatars, a white search bar, and white-on-black play buttons in Now Playing. Tokens live in `components/theme.ts`.
+- [x] **Playlists:** create, rename, delete, add from any song's menu or a whole album/artist, reorder (move up/down), remove. A mosaic cover from the first four covers. Library gets a "Playlists" section. Hero pages (album, artist, playlist) have play and shuffle play.
+- [x] **Track menu** is now a bottom sheet (Android alerts allow only 3 buttons): play next, add to queue, add to playlist, go to album or artist, delete. Also reachable from a ⋮ button and a screen-reader action.
+- [x] **Queue persistence:** restoring the queue skips tracks whose files vanished.
+- [x] **Accessibility:** labels on every control, 44 pt targets, and track rows sized from the system font scale so large text isn't clipped.
+- [x] **Offline banners** on Discover, Get and Downloads. Library, Search and Now Playing work offline.
+- Skipped by the owner's decision: cold-start / latency benchmarks. Not possible here: device matrix testing (only the Galaxy A32 is available).
 
 ## Decisions
 1. **Platform scope:** v1 ships **Android first**. Keep code cross-platform (no Android-only APIs outside `services/media/deviceScan.ts`), but test, tune and release on Android only. iOS (import-only) follows after v1.

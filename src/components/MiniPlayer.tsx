@@ -6,9 +6,9 @@ import { selectCurrentTrack, usePlayer } from '@/state/player';
 
 import { CoverImage } from './CoverImage';
 import { IconButton } from './IconButton';
-import { useTheme } from './theme';
+import { radius, useTheme } from './theme';
 
-/** Sits above the tab bar on every screen (spec 5). Hidden when the queue is empty. */
+/** Floating card above the tab bar on every screen (spec 5). Hidden when the queue is empty. */
 export function MiniPlayer() {
   const t = useTheme();
   const track = usePlayer(selectCurrentTrack);
@@ -18,35 +18,41 @@ export function MiniPlayer() {
 
   if (!track) return null;
   return (
-    <View style={[styles.wrap, { backgroundColor: t.surface, borderTopColor: t.border }]}>
-      <View style={[styles.progress, { width: `${progress * 100}%`, backgroundColor: t.accent }]} />
-      <Pressable
-        style={styles.main}
-        onPress={() => router.push('/player')}
-        accessibilityRole="button"
-        accessibilityLabel={`Now playing: ${track.title}${track.artist ? ` by ${track.artist}` : ''}. Opens the player.`}
-      >
-        <CoverImage uri={track.artwork_uri} seed={track.album ?? track.title} size={40} />
-        <View style={styles.text}>
-          <Text numberOfLines={1} style={[styles.title, { color: t.text }]}>
-            {track.title}
-          </Text>
-          <Text numberOfLines={1} style={[styles.artist, { color: t.textMuted }]}>
-            {track.artist ?? 'Unknown artist'}
-          </Text>
+    <View style={styles.outer}>
+      <View style={[styles.card, { backgroundColor: t.player }]}>
+        <Pressable
+          style={styles.main}
+          onPress={() => router.push('/player')}
+          accessibilityRole="button"
+          accessibilityLabel={`Now playing: ${track.title}${track.artist ? ` by ${track.artist}` : ''}. Opens the player.`}
+        >
+          <CoverImage uri={track.artwork_uri} seed={track.album ?? track.title} size={40} />
+          <View style={styles.text}>
+            <Text numberOfLines={1} style={[styles.title, { color: t.text }]}>
+              {track.title}
+            </Text>
+            <Text numberOfLines={1} style={[styles.artist, { color: t.textMuted }]}>
+              {track.artist ?? 'Unknown artist'}
+            </Text>
+          </View>
+        </Pressable>
+        <IconButton icon={isPlaying ? 'pause' : 'play'} label={isPlaying ? 'Pause' : 'Play'} size={26} onPress={togglePlay} />
+        <IconButton icon="play-skip-forward" label="Next song" size={22} onPress={skipToNext} disabled={!hasNext} />
+        <View style={[styles.progressTrack, { backgroundColor: 'rgba(255,255,255,0.18)' }]}>
+          <View style={[styles.progress, { width: `${progress * 100}%`, backgroundColor: t.text }]} />
         </View>
-      </Pressable>
-      <IconButton icon={isPlaying ? 'pause' : 'play'} label={isPlaying ? 'Pause' : 'Play'} onPress={togglePlay} />
-      <IconButton icon="play-skip-forward" label="Next song" onPress={skipToNext} disabled={!hasNext} />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { flexDirection: 'row', alignItems: 'center', paddingRight: 8, borderTopWidth: StyleSheet.hairlineWidth },
-  progress: { position: 'absolute', top: 0, left: 0, height: 2 },
-  main: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingLeft: 12, minWidth: 0 },
+  outer: { paddingHorizontal: 8, paddingBottom: 6 },
+  card: { flexDirection: 'row', alignItems: 'center', paddingRight: 4, borderRadius: radius.md, overflow: 'hidden' },
+  main: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingLeft: 8, minWidth: 0 },
   text: { flex: 1, minWidth: 0 },
-  title: { fontSize: 15, fontWeight: '600' },
+  title: { fontSize: 14, fontWeight: '700' },
   artist: { fontSize: 13 },
+  progressTrack: { position: 'absolute', left: 8, right: 8, bottom: 0, height: 2, borderRadius: 1 },
+  progress: { height: 2, borderRadius: 1 },
 });
