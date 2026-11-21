@@ -58,8 +58,8 @@ export class LibraryMatcher<T extends MatchTrack = Track> {
     }
   }
 
-  private names(credit: string, artists: MbArtistRef[]): string[] {
-    return [...new Set([...artistKeys(credit), ...artists.flatMap((a) => artistKeys(a.name))])];
+  private names(credit: string | undefined, artists: MbArtistRef[] | undefined): string[] {
+    return [...new Set([...artistKeys(credit), ...(artists ?? []).flatMap((a) => artistKeys(a.name))])];
   }
 
   matchRecording(r: Pick<MbRecording, 'id' | 'title' | 'artistCredit' | 'artists'>): T | undefined {

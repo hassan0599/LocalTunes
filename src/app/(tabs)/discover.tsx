@@ -71,7 +71,8 @@ export default function DiscoverScreen() {
           </Pressable>
         ))}
       </View>
-      {q ? <Results query={q} kind={kind} /> : <Home />}
+      {/* Keyed so switching type or query never renders old results with the new row type. */}
+      {q ? <Results key={`${kind}:${q}`} query={q} kind={kind} /> : <Home />}
     </View>
   );
 }

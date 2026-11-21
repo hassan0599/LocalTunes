@@ -67,6 +67,12 @@ describe('LibraryMatcher', () => {
     expect(m.matchRecording({ id: 'z', title: 'So What', artistCredit: 'Pink', artists: [] })).toBeUndefined();
   });
 
+  it('tolerates results without artist data (e.g. a row rendered from another result type)', () => {
+    const odd = { id: 'q', title: 'So What' } as unknown as Parameters<typeof m.matchRecording>[0];
+    expect(() => m.matchRecording(odd)).not.toThrow();
+    expect(() => m.hasReleaseGroup({ title: 'Kind of Blue' } as never)).not.toThrow();
+  });
+
   it('knows albums and artists in the library', () => {
     expect(m.hasReleaseGroup({ title: 'Kind of Blue', artistCredit: 'Miles Davis', artists: [] })).toBe(true);
     expect(m.hasReleaseGroup({ title: 'Bitches Brew', artistCredit: 'Miles Davis', artists: [] })).toBe(false);
