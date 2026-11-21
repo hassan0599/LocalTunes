@@ -24,6 +24,7 @@ const row = (id: number, extra: Partial<DownloadRow> = {}): DownloadRow => ({
   license: 'https://creativecommons.org/licenses/by/4.0/',
   artwork_url: null,
   mbid: null,
+  genre: null,
   status: 'queued',
   bytes_done: 0,
   bytes_total: null,

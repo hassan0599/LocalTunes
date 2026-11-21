@@ -5,7 +5,8 @@
 /// <reference types="node" />
 
 import { buildMatchQuery, searchLibrary } from '../fts';
-import { deleteTrack, insertTrack, type NewTrack } from '../queries';
+import { addToPlaylist, createPlaylist } from '../playlists';
+import { deleteTrack, insertTrack, listGenreTracks, type NewTrack } from '../queries';
 import { migrate } from '../schema';
 import { openTestDb } from '../testing/nodeDb';
 
@@ -54,7 +55,54 @@ describe('migrations', () => {
     await migrate(db);
     await migrate(db);
     const { user_version } = (await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))!;
-    expect(user_version).toBe(4);
+    expect(user_version).toBe(5);
+  });
+});
+
+describe('genre and playlist search', () => {
+  async function withGenres() {
+    const db = openTestDb();
+    await migrate(db);
+    for (const t of [
+      T('So What', 'Miles Davis', 'Kind of Blue', { genre: 'Jazz' }),
+      T('Moanin', 'Art Blakey', 'Moanin', { genre: 'Jazz, Hard Bop' }),
+      T('Sing Sing Sing', 'Benny Goodman', 'Swing Hits', { genre: 'Jazz, Swing' }),
+      T('Smells Like Teen Spirit', 'Nirvana', 'Nevermind', { genre: 'Grunge, Rock' }),
+      T('Jazz Police', 'Leonard Cohen', 'I’m Your Man', { genre: 'Rock' }),
+    ]) {
+      await insertTrack(db, t);
+    }
+    return db;
+  }
+
+  it('groups genres by track count and only returns the genres that match', async () => {
+    const db = await withGenres();
+    const r = await searchLibrary(db, 'jazz');
+    expect(r.genres).toEqual([{ genre: 'Jazz', track_count: 3 }]);
+    expect((await searchLibrary(db, 'sw')).genres).toEqual([{ genre: 'Swing', track_count: 1 }]);
+    expect((await searchLibrary(db, 'hard b')).genres.map((g) => g.genre)).toEqual(['Hard Bop']);
+  });
+
+  it('ranks songs matching by title above songs matching only by genre', async () => {
+    const db = await withGenres();
+    const r = await searchLibrary(db, 'jazz');
+    expect(r.songs[0].title).toBe('Jazz Police');
+    expect(r.songs.map((s) => s.title)).toEqual(expect.arrayContaining(['So What', 'Moanin', 'Sing Sing Sing']));
+  });
+
+  it('lists a genre’s songs from comma-separated genre fields, case-insensitively', async () => {
+    const db = await withGenres();
+    expect((await listGenreTracks(db, 'rock')).map((t) => t.title).sort()).toEqual(['Jazz Police', 'Smells Like Teen Spirit']);
+    expect(await listGenreTracks(db, 'Bop')).toEqual([]); // whole genre names only
+  });
+
+  it('finds playlists by name', async () => {
+    const db = await withGenres();
+    const id = await createPlaylist(db, 'Late Night Jazz');
+    await addToPlaylist(db, id, [1, 2]);
+    await createPlaylist(db, 'Gym');
+    const r = await searchLibrary(db, 'late ja');
+    expect(r.playlists).toMatchObject([{ id, name: 'Late Night Jazz', track_count: 2 }]);
   });
 });
 

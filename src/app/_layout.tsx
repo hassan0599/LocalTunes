@@ -9,6 +9,7 @@ import { useTheme } from '@/components/theme';
 import { DB_NAME, migrate } from '@/db/schema';
 import { startDownloads } from '@/services/downloads/manager';
 import { scanDevice, type ScanTrigger } from '@/services/media/deviceScan';
+import { backfillGenres } from '@/services/media/genreBackfill';
 import { pruneCache } from '@/services/musicbrainz/cache';
 import { setupPlayback } from '@/services/playback/PlaybackService';
 import { startNetworkMonitoring } from '@/state/network';
@@ -42,7 +43,13 @@ function Bootstrap({ children }: { children: ReactNode }) {
         (r) => __DEV__ && console.log('device scan', trigger, JSON.stringify(r)),
         (e) => console.warn('device scan failed', e),
       );
-    void scan('launch');
+    // After the launch scan, fill in genres for songs added before genres were stored.
+    void scan('launch').then(() =>
+      backfillGenres(db).then(
+        (n) => __DEV__ && n && console.log('genre backfill', n),
+        (e) => console.warn('genre backfill failed', e),
+      ),
+    );
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') void scan('foreground');
     });
@@ -75,6 +82,7 @@ export default function RootLayout() {
           <Stack.Screen name="wishlist" options={{ title: 'Wishlist' }} />
           <Stack.Screen name="get" options={{ title: 'Get music' }} />
           <Stack.Screen name="playlist" options={{ title: 'Playlist' }} />
+          <Stack.Screen name="library-genre" options={{ title: 'Genre' }} />
         </Stack>
         <SheetHost />
       </Bootstrap>

@@ -148,6 +148,35 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX idx_downloads_status ON downloads(status, created_at);
   `,
+
+  // v5 — genre search: a genre column on tracks (and downloads, to carry the source's
+  // genre into the library), and genre added to the full-text index.
+  `
+  ALTER TABLE tracks ADD COLUMN genre TEXT;
+  ALTER TABLE downloads ADD COLUMN genre TEXT;
+
+  DROP TRIGGER tracks_ai;
+  DROP TRIGGER tracks_ad;
+  DROP TRIGGER tracks_au;
+  DROP TABLE tracks_fts;
+  CREATE VIRTUAL TABLE tracks_fts USING fts5(
+    title, artist, album, genre,
+    content='tracks', content_rowid='id',
+    tokenize='unicode61 remove_diacritics 2',
+    prefix='1 2 3'
+  );
+  INSERT INTO tracks_fts(tracks_fts) VALUES ('rebuild');
+  CREATE TRIGGER tracks_ai AFTER INSERT ON tracks BEGIN
+    INSERT INTO tracks_fts(rowid, title, artist, album, genre) VALUES (new.id, new.title, new.artist, new.album, new.genre);
+  END;
+  CREATE TRIGGER tracks_ad AFTER DELETE ON tracks BEGIN
+    INSERT INTO tracks_fts(tracks_fts, rowid, title, artist, album, genre) VALUES ('delete', old.id, old.title, old.artist, old.album, old.genre);
+  END;
+  CREATE TRIGGER tracks_au AFTER UPDATE OF title, artist, album, genre ON tracks BEGIN
+    INSERT INTO tracks_fts(tracks_fts, rowid, title, artist, album, genre) VALUES ('delete', old.id, old.title, old.artist, old.album, old.genre);
+    INSERT INTO tracks_fts(rowid, title, artist, album, genre) VALUES (new.id, new.title, new.artist, new.album, new.genre);
+  END;
+  `,
 ];
 
 export async function migrate(db: SQLiteDatabase): Promise<void> {

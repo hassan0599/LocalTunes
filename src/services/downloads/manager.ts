@@ -233,6 +233,7 @@ async function finalize(row: DownloadRow, file: File) {
     album: row.album ?? tags.album ?? null,
     album_artist: tags.albumArtist ?? null,
     track_no: row.track_no ?? tags.trackNo ?? null,
+    genre: tags.genre ?? row.genre ?? null,
     duration_ms: tags.durationMs ?? row.duration_ms ?? null,
     file_uri: dest.uri,
     source: row.source as TrackSource,
@@ -284,8 +285,8 @@ export async function enqueue(track: SourceTrack, extra: { mbid?: string } = {})
 
   const resolved = await sourceById(track.source).resolve(track);
   await database.runAsync(
-    `INSERT INTO downloads (source, source_id, url, ext, title, artist, album, track_no, duration_ms, license, artwork_url, mbid, bytes_total, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO downloads (source, source_id, url, ext, title, artist, album, track_no, duration_ms, license, artwork_url, mbid, bytes_total, created_at, genre)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     track.source,
     track.sourceId,
     resolved.url,
@@ -300,6 +301,7 @@ export async function enqueue(track: SourceTrack, extra: { mbid?: string } = {})
     track.mbid ?? extra.mbid ?? null,
     track.sizeBytes ?? null,
     Date.now(),
+    track.genre ?? null,
   );
   await kick();
   return 'queued';

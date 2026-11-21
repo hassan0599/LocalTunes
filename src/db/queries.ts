@@ -16,6 +16,8 @@ export interface Track {
   license: string | null;
   mbid: string | null;
   device_id: string | null;
+  /** Comma-separated: "Jazz, Swing". */
+  genre: string | null;
   added_at: number;
   last_played_at: number | null;
   play_count: number;
@@ -25,7 +27,7 @@ export type NewTrack = Pick<Track, 'title' | 'file_uri' | 'source'> &
   Partial<
     Pick<
       Track,
-      'artist' | 'album' | 'album_artist' | 'track_no' | 'duration_ms' | 'artwork_uri' | 'license' | 'mbid' | 'device_id'
+      'artist' | 'album' | 'album_artist' | 'track_no' | 'duration_ms' | 'artwork_uri' | 'license' | 'mbid' | 'device_id' | 'genre'
     >
   >;
 
@@ -77,8 +79,8 @@ export async function getTracksByIds(db: SQLiteDatabase, ids: number[]): Promise
 
 export async function insertTrack(db: SQLiteDatabase, t: NewTrack): Promise<number> {
   const res = await db.runAsync(
-    `INSERT INTO tracks (title, artist, album, album_artist, track_no, duration_ms, file_uri, artwork_uri, source, license, mbid, device_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO tracks (title, artist, album, album_artist, track_no, duration_ms, file_uri, artwork_uri, source, license, mbid, device_id, genre)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     t.title,
     t.artist ?? null,
     t.album ?? null,
@@ -91,6 +93,7 @@ export async function insertTrack(db: SQLiteDatabase, t: NewTrack): Promise<numb
     t.license ?? null,
     t.mbid ?? null,
     t.device_id ?? null,
+    t.genre ?? null,
   );
   return res.lastInsertRowId;
 }
@@ -157,6 +160,20 @@ export function listArtists(db: SQLiteDatabase): Promise<ArtistSummary[]> {
      GROUP BY artist COLLATE NOCASE
      ORDER BY artist COLLATE NOCASE`,
   );
+}
+
+/** Tracks whose genre list contains `genre` (stored as "A, B"); case-insensitive. */
+export function listGenreTracks(db: SQLiteDatabase, genre: string): Promise<Track[]> {
+  const escaped = genre.replace(/[\\%_]/g, (c) => `\\${c}`);
+  return db.getAllAsync<Track>(
+    `SELECT * FROM tracks WHERE (', ' || genre || ', ') LIKE ? ESCAPE '\\'
+     ORDER BY artist COLLATE NOCASE, album COLLATE NOCASE, track_no, title COLLATE NOCASE`,
+    `%, ${escaped}, %`,
+  );
+}
+
+export async function setTrackGenre(db: SQLiteDatabase, id: number, genre: string | null): Promise<void> {
+  await db.runAsync('UPDATE tracks SET genre = ? WHERE id = ?', genre, id);
 }
 
 export function listArtistTracks(db: SQLiteDatabase, artist: string): Promise<Track[]> {

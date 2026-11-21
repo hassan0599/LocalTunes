@@ -2,15 +2,16 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { CoverImage } from '@/components/CoverImage';
 import { IconButton } from '@/components/IconButton';
+import { parseCovers, PlaylistCover } from '@/components/PlaylistCover';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { TOUCH, useTheme } from '@/components/theme';
+import { TOUCH, tileColor, useTheme } from '@/components/theme';
 import { showTrackActions } from '@/components/trackActions';
 import { TrackRow } from '@/components/TrackRow';
-import { EMPTY_RESULTS, searchLibrary, type SearchResults } from '@/db/fts';
+import { EMPTY_RESULTS, searchLibrary, type GenreSummary, type PlaylistHit, type SearchResults } from '@/db/fts';
 import type { AlbumSummary, ArtistSummary, Track } from '@/db/queries';
 import { playTracks } from '@/services/playback/PlaybackService';
 import { useLibraryVersion } from '@/state/library';
@@ -25,7 +26,11 @@ type Row =
   | { kind: 'song'; track: Track }
   | { kind: 'album'; album: AlbumSummary }
   | { kind: 'artist'; artist: ArtistSummary }
-  | { kind: 'more'; group: 'albums' | 'artists'; count: number };
+  | { kind: 'genres'; genres: GenreSummary[] }
+  | { kind: 'playlist'; playlist: PlaylistHit }
+  | { kind: 'more'; group: Group; count: number };
+
+type Group = 'albums' | 'artists' | 'playlists';
 
 interface Section {
   title: string;
@@ -40,7 +45,7 @@ export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResults>(EMPTY_RESULTS);
   const [searched, setSearched] = useState('');
-  const [expanded, setExpanded] = useState<{ albums: boolean; artists: boolean }>({ albums: false, artists: false });
+  const [expanded, setExpanded] = useState<Record<Group, boolean>>({ albums: false, artists: false, playlists: false });
   const requestId = useRef(0);
 
   useEffect(() => {
@@ -58,7 +63,7 @@ export default function SearchScreen() {
         if (id === requestId.current) {
           setResults(r);
           setSearched(q);
-          setExpanded({ albums: false, artists: false });
+          setExpanded({ albums: false, artists: false, playlists: false });
         }
       } catch (e) {
         console.warn('search failed', e);
@@ -74,10 +79,12 @@ export default function SearchScreen() {
   const onSongLongPress = useCallback((track: Track) => showTrackActions(db, track), [db]);
 
   const sections: Section[] = [];
+  // Genres first: a compact row of tiles, each opening that genre's songs.
+  if (results.genres.length) sections.push({ title: 'Genres', data: [{ kind: 'genres', genres: results.genres }] });
   if (results.songs.length) {
     sections.push({ title: 'Songs', data: results.songs.map((track) => ({ kind: 'song', track })) });
   }
-  const group = <T,>(key: 'albums' | 'artists', title: string, items: T[], toRow: (x: T) => Row) => {
+  const group = <T,>(key: Group, title: string, items: T[], toRow: (x: T) => Row) => {
     if (!items.length) return;
     const shown = expanded[key] ? items : items.slice(0, GROUP_PREVIEW);
     const rows = shown.map(toRow);
@@ -86,6 +93,7 @@ export default function SearchScreen() {
   };
   group('albums', 'Albums', results.albums, (album) => ({ kind: 'album', album }));
   group('artists', 'Artists', results.artists, (artist) => ({ kind: 'artist', artist }));
+  group('playlists', 'Playlists', results.playlists, (playlist) => ({ kind: 'playlist', playlist }));
 
   const hasQuery = query.trim().length > 0;
   const noResults = hasQuery && searched === query.trim() && sections.length === 0;
@@ -98,7 +106,7 @@ export default function SearchScreen() {
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Songs, albums, artists"
+          placeholder="Songs, artists, genres, playlists"
           placeholderTextColor="#535353"
           style={[styles.input, { color: "#121212", fontWeight: "600" }]}
           autoCorrect={false}
@@ -114,7 +122,7 @@ export default function SearchScreen() {
         <View style={styles.hint}>
           <Ionicons name="musical-notes-outline" size={48} color={t.textMuted} />
           <Text style={[styles.hintText, { color: t.textMuted }]}>
-            Search everything in your library, including music already on this phone. Works offline.
+            Search songs, artists, albums, genres and playlists, including music already on this phone. Works offline.
           </Text>
         </View>
       ) : noResults ? (
@@ -134,7 +142,11 @@ export default function SearchScreen() {
                 ? `al${row.album.album}\u0000${row.album.artist ?? ''}`
                 : row.kind === 'artist'
                   ? `ar${row.artist.artist}`
-                  : `more${row.group}${i}`
+                  : row.kind === 'genres'
+                    ? 'genres'
+                    : row.kind === 'playlist'
+                      ? `pl${row.playlist.id}`
+                      : `more${row.group}${i}`
           }
           renderSectionHeader={({ section }) => (
             <Text style={[styles.sectionTitle, { color: t.text }]} accessibilityRole="header">
@@ -156,6 +168,10 @@ export default function SearchScreen() {
                 return <AlbumRow album={item.album} />;
               case 'artist':
                 return <ArtistRow artist={item.artist} />;
+              case 'genres':
+                return <GenreTiles genres={item.genres} />;
+              case 'playlist':
+                return <PlaylistRow playlist={item.playlist} />;
               case 'more':
                 return (
                   <Pressable
@@ -171,6 +187,51 @@ export default function SearchScreen() {
         />
       )}
     </View>
+  );
+}
+
+function GenreTiles({ genres }: { genres: GenreSummary[] }) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.genreRow}>
+      {genres.map((g) => (
+        <Pressable
+          key={g.genre}
+          onPress={() => router.push({ pathname: '/library-genre', params: { name: g.genre } })}
+          style={({ pressed }) => [styles.genreTile, { backgroundColor: tileColor(g.genre.toLowerCase()), opacity: pressed ? 0.8 : 1 }]}
+          accessibilityRole="button"
+          accessibilityLabel={`Genre ${g.genre}, ${g.track_count} songs`}
+        >
+          <Text style={styles.genreName} numberOfLines={2}>
+            {g.genre}
+          </Text>
+          <Text style={styles.genreCount}>
+            {g.track_count} {g.track_count === 1 ? 'song' : 'songs'}
+          </Text>
+        </Pressable>
+      ))}
+    </ScrollView>
+  );
+}
+
+function PlaylistRow({ playlist }: { playlist: PlaylistHit }) {
+  const t = useTheme();
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.row, pressed && { backgroundColor: t.surface }]}
+      onPress={() => router.push({ pathname: '/playlist', params: { id: String(playlist.id) } })}
+      accessibilityRole="button"
+      accessibilityLabel={`Playlist ${playlist.name}, ${playlist.track_count} songs`}
+    >
+      <PlaylistCover covers={parseCovers(playlist.covers)} size={48} />
+      <View style={styles.rowText}>
+        <Text numberOfLines={1} style={[styles.rowTitle, { color: t.text }]}>
+          {playlist.name}
+        </Text>
+        <Text numberOfLines={1} style={{ color: t.textMuted, fontSize: 13 }}>
+          Playlist · {playlist.track_count} {playlist.track_count === 1 ? 'song' : 'songs'}
+        </Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -238,4 +299,8 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, minWidth: 0 },
   rowTitle: { fontSize: 16, fontWeight: '500' },
   more: { paddingHorizontal: 16, minHeight: TOUCH, justifyContent: 'center' },
+  genreRow: { gap: 10, paddingHorizontal: 16, paddingVertical: 4 },
+  genreTile: { width: 140, height: 80, borderRadius: 8, padding: 10, justifyContent: 'space-between' },
+  genreName: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  genreCount: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600' },
 });

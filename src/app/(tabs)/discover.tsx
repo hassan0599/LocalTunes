@@ -14,6 +14,7 @@ import {
   SectionTitle,
 } from '@/components/discover/parts';
 import { IconButton } from '@/components/IconButton';
+import { prefixMatches, tokenize } from '@/db/fts';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { TOUCH, useTheme } from '@/components/theme';
 import {
@@ -115,9 +116,21 @@ function Results({ query, kind }: { query: string; kind: SearchKind }) {
     [query, kind],
   );
   const items = state.data?.items ?? [];
+  // Genre shortcuts: known genres the query prefix-matches, or the query itself as a tag
+  // (MusicBrainz has far more tags than the fixed list: "synthwave", "city pop"…).
+  const tokens = tokenize(query);
+  const known = GENRES.filter((g) => prefixMatches(tokens, g));
+  const genres = known.length ? known.slice(0, 6) : tokens.length <= 3 ? [query.toLowerCase()] : [];
   return (
     <View style={{ flex: 1 }}>
       <OfflineBanner stale={state.stale} />
+      {genres.length > 0 && (
+        <View style={styles.genreRow}>
+          {genres.map((g) => (
+            <GenreTile key={g} label={known.length ? g : `${g} (genre)`} onPress={() => router.push({ pathname: '/genre', params: { tag: g } })} />
+          ))}
+        </View>
+      )}
       <MbStatus state={state} empty={items.length === 0}>
         <FlatList
           data={items}
@@ -144,6 +157,7 @@ const styles = StyleSheet.create({
   inputWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, paddingLeft: 12, borderRadius: 12, minHeight: TOUCH },
   input: { flex: 1, fontSize: 16, paddingVertical: 10 },
   kinds: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
+  genreRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
   kind: { minHeight: 36, paddingHorizontal: 16, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   wishRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, paddingHorizontal: 14, minHeight: 52, borderRadius: 12 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 16 },

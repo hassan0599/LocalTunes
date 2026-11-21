@@ -16,6 +16,7 @@ export interface DownloadRow {
   license: string;
   artwork_url: string | null;
   mbid: string | null;
+  genre: string | null;
   status: DownloadStatus;
   bytes_done: number;
   bytes_total: number | null;

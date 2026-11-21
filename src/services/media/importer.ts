@@ -71,6 +71,7 @@ async function importOne(db: SQLiteDatabase, picked: File, originalName: string)
       album: tags.album ?? null,
       album_artist: tags.albumArtist ?? null,
       track_no: tags.trackNo ?? fromName.trackNo ?? null,
+      genre: tags.genre ?? null,
       duration_ms: tags.durationMs ?? null,
       file_uri: dest.uri,
       source: 'imported',

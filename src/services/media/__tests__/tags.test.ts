@@ -1,7 +1,7 @@
 /// <reference types="jest" />
 /// <reference types="node" />
 
-import { readTags, tagsFromFileName, type ByteSource } from '../tags';
+import { parseGenre, readTags, tagsFromFileName, type ByteSource } from '../tags';
 
 // ---------------------------------------------------------------- fixture builders
 
@@ -140,6 +140,32 @@ describe('readTags: MP4', () => {
 describe('readTags: unknown formats', () => {
   it('returns no tags for non-audio data', async () => {
     expect(await readTags(source(bytes('RIFF....WAVEfmt ', new Uint8Array(200))))).toEqual({});
+  });
+});
+
+describe('genres', () => {
+  it('reads ID3v2 TCON, including numeric references', async () => {
+    const file = bytes(id3v23(id3Frame('TIT2', bytes([0], 'T')), id3Frame('TCON', bytes([0], '(8)Jazz'))), xingFrame(10));
+    expect((await readTags(source(file))).genre).toBe('Jazz');
+    const numeric = bytes(id3v23(id3Frame('TCON', bytes([0], '(17)'))), xingFrame(10));
+    expect((await readTags(source(numeric))).genre).toBe('Rock');
+  });
+
+  it('reads the ID3v1 genre byte', async () => {
+    const audio = new Uint8Array(2000);
+    audio.set([0xff, 0xfb, 0x90, 0x00]);
+    const v1 = new Uint8Array(128);
+    v1.set(bytes('TAG', 'Title'), 0);
+    v1[127] = 32; // Classical
+    expect((await readTags(source(bytes(audio, v1)))).genre).toBe('Classical');
+  });
+
+  it('normalises lists and case', () => {
+    expect(parseGenre('rock; pop')).toBe('Rock, Pop');
+    expect(parseGenre('Hip-Hop/Rap')).toBe('Hip-Hop/Rap');
+    expect(parseGenre('(13)(17)')).toBe('Pop, Rock');
+    expect(parseGenre('Electronic, electronic')).toBe('Electronic');
+    expect(parseGenre('  ')).toBeUndefined();
   });
 });
 

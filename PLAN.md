@@ -75,6 +75,7 @@ If on-device testing shows gaps (remote next/previous, focus loss during calls),
 - [x] **Queue persistence:** restoring the queue skips tracks whose files vanished.
 - [x] **Accessibility:** labels on every control, 44 pt targets, and track rows sized from the system font scale so large text isn't clipped.
 - [x] **Offline banners** on Discover, Get and Downloads. Library, Search and Now Playing work offline.
+- [x] **Genre and playlist search** (owner request, 2026-11-20). Migration v5 adds `tracks.genre` and indexes it in FTS. Genres are read from ID3 TCON (including numeric codes), ID3v1, Vorbis GENRE and MP4 ©gen/gnre, plus Internet Archive file metadata and Jamendo `musicinfo`. A one-time background backfill covers older tracks. The Search tab shows a Genres row (opens the genre's songs) and a Playlists group. Discover search offers matching MusicBrainz genre tiles.
 - Skipped by the owner's decision: cold-start / latency benchmarks. Not possible here: device matrix testing (only the Galaxy A32 is available).
 
 ## Decisions

@@ -25,6 +25,8 @@ export interface AudioTags {
   album?: string;
   albumArtist?: string;
   trackNo?: number;
+  /** Comma-separated, title-cased: "Jazz, Swing". */
+  genre?: string;
   durationMs?: number;
   picture?: Picture;
 }
@@ -193,6 +195,7 @@ async function readId3v2(src: ByteSource): Promise<{ tags: AudioTags; end: numbe
       title: pick('TIT2', 'TT2'),
       artist: pick('TPE1', 'TP1'),
       album: pick('TALB', 'TAL'),
+      genre: parseGenre(text.TCON ?? text.TCO),
       albumArtist: pick('TPE2', 'TP2'),
       trackNo: parseTrackNo(text.TRCK ?? text.TRK),
       durationMs: Number.isFinite(tlen) && tlen > 0 ? tlen : undefined,
@@ -266,6 +269,7 @@ async function readId3v1(src: ByteSource): Promise<AudioTags> {
     artist: field(33, 30),
     album: field(63, 30),
     trackNo: b[125] === 0 && b[126] > 0 ? b[126] : undefined,
+    genre: ID3V1_GENRES[b[127]],
   };
 }
 
@@ -372,6 +376,7 @@ async function readFlac(src: ByteSource, start: number): Promise<AudioTags> {
   out.album = clean(comments.ALBUM);
   out.albumArtist = clean(comments.ALBUMARTIST ?? comments['ALBUM ARTIST']);
   out.trackNo = parseTrackNo(comments.TRACKNUMBER);
+  out.genre = parseGenre(comments.GENRE);
   return out;
 }
 
@@ -465,6 +470,13 @@ async function readMp4(src: ByteSource): Promise<AudioTags> {
       case 'aART':
         out.albumArtist = clean(utf8(value));
         break;
+      case '©gen':
+        out.genre = parseGenre(utf8(value));
+        break;
+      case 'gnre':
+        // Legacy MP4 genre: ID3v1 index + 1.
+        if (!out.genre && value.length >= 2) out.genre = ID3V1_GENRES[u16be(value, 0) - 1];
+        break;
       case 'trkn':
         if (value.length >= 4 && u16be(value, 2) > 0) out.trackNo = u16be(value, 2);
         break;
@@ -476,6 +488,53 @@ async function readMp4(src: ByteSource): Promise<AudioTags> {
     }
   }
   return out;
+}
+
+// ---------------------------------------------------------------- genres
+
+/** ID3v1 genre codes 0–125 (the original 80 plus the Winamp extensions). */
+export const ID3V1_GENRES: string[] = [
+  'Blues', 'Classic Rock', 'Country', 'Dance', 'Disco', 'Funk', 'Grunge', 'Hip-Hop', 'Jazz', 'Metal',
+  'New Age', 'Oldies', 'Other', 'Pop', 'R&B', 'Rap', 'Reggae', 'Rock', 'Techno', 'Industrial',
+  'Alternative', 'Ska', 'Death Metal', 'Pranks', 'Soundtrack', 'Euro-Techno', 'Ambient', 'Trip-Hop', 'Vocal', 'Jazz+Funk',
+  'Fusion', 'Trance', 'Classical', 'Instrumental', 'Acid', 'House', 'Game', 'Sound Clip', 'Gospel', 'Noise',
+  'Alternative Rock', 'Bass', 'Soul', 'Punk', 'Space', 'Meditative', 'Instrumental Pop', 'Instrumental Rock', 'Ethnic', 'Gothic',
+  'Darkwave', 'Techno-Industrial', 'Electronic', 'Pop-Folk', 'Eurodance', 'Dream', 'Southern Rock', 'Comedy', 'Cult', 'Gangsta',
+  'Top 40', 'Christian Rap', 'Pop/Funk', 'Jungle', 'Native American', 'Cabaret', 'New Wave', 'Psychedelic', 'Rave', 'Showtunes',
+  'Trailer', 'Lo-Fi', 'Tribal', 'Acid Punk', 'Acid Jazz', 'Polka', 'Retro', 'Musical', 'Rock & Roll', 'Hard Rock',
+  'Folk', 'Folk-Rock', 'National Folk', 'Swing', 'Fast Fusion', 'Bebop', 'Latin', 'Revival', 'Celtic', 'Bluegrass',
+  'Avantgarde', 'Gothic Rock', 'Progressive Rock', 'Psychedelic Rock', 'Symphonic Rock', 'Slow Rock', 'Big Band', 'Chorus', 'Easy Listening', 'Acoustic',
+  'Humour', 'Speech', 'Chanson', 'Opera', 'Chamber Music', 'Sonata', 'Symphony', 'Booty Bass', 'Primus', 'Porn Groove',
+  'Satire', 'Slow Jam', 'Club', 'Tango', 'Samba', 'Folklore', 'Ballad', 'Power Ballad', 'Rhythmic Soul', 'Freestyle',
+  'Duet', 'Punk Rock', 'Drum Solo', 'A Cappella', 'Euro-House', 'Dance Hall',
+];
+
+// ASCII-only on purpose: avoids relying on Unicode property escapes in the JS engine.
+const titleCase = (s: string) => s.replace(/(^|[\s\-&/])([a-z])/g, (_, sep: string, c: string) => sep + c.toUpperCase());
+
+/**
+ * Normalise a raw genre tag: "(17)", "(8)Jazz", "17", "rock; pop", NUL-separated lists
+ * → "Rock", "Jazz", "Rock", "Rock, Pop". Returns undefined when nothing is left.
+ */
+export function parseGenre(raw: string | null | undefined): string | undefined {
+  if (!raw) return undefined;
+  const out: string[] = [];
+  for (let part of raw.split(/[;\u0000]|\s*,\s*/)) {
+    part = part.trim();
+    // "(13)(17)" → two references; "(8)Jazz" → text wins.
+    const refs = [...part.matchAll(/\((\d+|RX|CR)\)/g)].map((m) => m[1]);
+    const rest = part.replace(/\((\d+|RX|CR)\)/g, '').trim();
+    const names = rest
+      ? [rest]
+      : refs.map((r) => (r === 'RX' ? 'Remix' : r === 'CR' ? 'Cover' : ID3V1_GENRES[Number(r)]));
+    if (!rest && !refs.length && /^\d+$/.test(part)) names.push(ID3V1_GENRES[Number(part)]);
+    for (const n of names) {
+      if (!n || /^\d+$/.test(n)) continue;
+      const name = n === n.toLowerCase() ? titleCase(n) : n;
+      if (!out.some((o) => o.toLowerCase() === name.toLowerCase())) out.push(name);
+    }
+  }
+  return out.length ? out.join(', ') : undefined;
 }
 
 // ---------------------------------------------------------------- file name fallback

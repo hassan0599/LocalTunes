@@ -10,6 +10,8 @@
  */
 import { JAMENDO_CLIENT_ID } from '@/config';
 
+import { parseGenre } from '@/services/media/tags';
+
 import { isOpenLicense } from './license';
 import type { MusicSource, SourceTrack } from './types';
 
@@ -22,6 +24,7 @@ export interface JamendoTrack {
   artist_name?: string;
   album_name?: string;
   album_id?: string;
+  musicinfo?: { tags?: { genres?: string[] } };
   position?: number;
   license_ccurl?: string;
   image?: string;
@@ -40,6 +43,7 @@ export function mapJamendoTrack(t: JamendoTrack): SourceTrack | null {
     artist: t.artist_name,
     album: t.album_name,
     trackNo: t.position || undefined,
+    genre: parseGenre(t.musicinfo?.tags?.genres?.join(', ')),
     durationMs: t.duration ? t.duration * 1000 : undefined,
     license: t.license_ccurl!,
     artworkUrl: t.album_image || t.image,
@@ -63,7 +67,7 @@ export const jamendo: MusicSource = {
       format: 'json',
       limit: '25',
       audiodlformat: 'mp32',
-      include: 'licenses',
+      include: 'licenses musicinfo',
     });
     // Verified live: `artist_name` filters exactly; `namesearch` returned nothing, so titles
     // (song or album) go through the free-text `search`, which also matches album names.

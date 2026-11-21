@@ -8,6 +8,8 @@
  */
 import { MUSICBRAINZ_USER_AGENT } from '@/config';
 
+import { parseGenre } from '@/services/media/tags';
+
 import { isOpenLicense } from './license';
 import type { MusicSource, SourceQuery, SourceTrack } from './types';
 
@@ -37,6 +39,7 @@ export interface IaFile {
   album?: string;
   track?: string;
   length?: string;
+  genre?: string;
   size?: string;
   original?: string;
   'external-identifier'?: string | string[];
@@ -130,6 +133,7 @@ export function tracksFromMetadata(meta: IaMetadata): SourceTrack[] {
       license: license!,
       artworkUrl: artwork ? fileUrl(id, artwork) : `https://archive.org/services/img/${id}`,
       mbid: files.map(mbidOf).find(Boolean),
+      genre: parseGenre(files.map((f) => f.genre).find(Boolean)),
       groupId: id,
       groupTitle: meta.metadata.title,
     });

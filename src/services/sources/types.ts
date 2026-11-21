@@ -9,6 +9,8 @@ export interface SourceTrack {
   artist?: string;
   album?: string;
   trackNo?: number;
+  /** Comma-separated genres, e.g. "Jazz, Swing". */
+  genre?: string;
   durationMs?: number;
   sizeBytes?: number;
   /** License URL (Creative Commons / public domain). Required: unlicensed audio is never offered. */
