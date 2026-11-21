@@ -84,6 +84,31 @@ describe('Internet Archive (real metadata: NIN "Ghosts I-IV", CC BY-NC-SA)', () 
   });
 });
 
+describe('Jamendo mapping (live response shape, 2026-11-20)', () => {
+  it('maps a real search result', () => {
+    const live = {
+      id: '889602',
+      name: 'Song for me by Marco Preti',
+      duration: 242,
+      artist_name: 'Jazz Friends',
+      album_name: 'Jazz Friends 2012',
+      album_id: '104645',
+      position: 2,
+      license_ccurl: 'http://creativecommons.org/licenses/by-nc-sa/3.0/',
+      audiodownload: 'https://prod-1.storage.jamendo.com/download/track/889602/mp32/',
+      audiodownload_allowed: true,
+    };
+    expect(mapJamendoTrack(live)).toMatchObject({
+      sourceId: '889602',
+      title: 'Song for me by Marco Preti',
+      artist: 'Jazz Friends',
+      trackNo: 2,
+      durationMs: 242_000,
+      license: 'http://creativecommons.org/licenses/by-nc-sa/3.0/',
+    });
+  });
+});
+
 describe('Jamendo mapping', () => {
   const base = {
     id: '123',

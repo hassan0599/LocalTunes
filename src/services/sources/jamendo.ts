@@ -5,8 +5,8 @@
  * EXPO_PUBLIC_JAMENDO_CLIENT_ID (e.g. in .env.local, which is gitignored). Without it the
  * source is disabled.
  *
- * Field names follow the Jamendo API v3.0 docs (`tracks` endpoint). Not yet verified
- * against the live API: do that once a client id exists.
+ * Field names follow the Jamendo API v3.0 `tracks` endpoint, verified against the live
+ * API on 2026-11-20 (see the fixture in __tests__).
  */
 import { JAMENDO_CLIENT_ID } from '@/config';
 
@@ -65,10 +65,11 @@ export const jamendo: MusicSource = {
       audiodlformat: 'mp32',
       include: 'licenses',
     });
+    // Verified live: `artist_name` filters exactly; `namesearch` returned nothing, so titles
+    // (song or album) go through the free-text `search`, which also matches album names.
     if (q.artist) params.set('artist_name', q.artist);
-    if (q.album && q.title) params.set('album_name', q.title);
-    else if (q.title) params.set('namesearch', q.title);
-    if (q.text) params.set('search', q.text);
+    const text = [q.title, q.text].filter(Boolean).join(' ');
+    if (text) params.set('search', text);
     const res = await fetch(`${API}?${params.toString()}`);
     if (!res.ok) throw new Error(`Jamendo responded ${res.status}`);
     const body = (await res.json()) as { results?: JamendoTrack[] };
