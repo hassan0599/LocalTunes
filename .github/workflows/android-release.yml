@@ -1,0 +1,139 @@
+# Builds a signed release APK and publishes it as a GitHub Release.
+#
+# Release:  bump "version" in app.json (e.g. 1.0.1), commit, then
+#           git tag v1.0.1 && git push origin v1.0.1
+# Test run: Actions tab → "Android release APK" → Run workflow (uploads the APK as a
+#           workflow artifact instead of creating a release).
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   ANDROID_KEYSTORE_BASE64   base64 of localtunes-upload.keystore
+#   ANDROID_KEYSTORE_PASSWORD store password
+#   ANDROID_KEY_ALIAS         key alias (localtunes)
+#   ANDROID_KEY_PASSWORD      key password
+name: Android release APK
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write # create the release and upload the APK
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck and test
+        run: |
+          npx tsc --noEmit
+          npx jest --ci
+
+      - name: Check version and derive versionCode
+        id: version
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" != "v$VERSION" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match app.json version $VERSION"
+            exit 1
+          fi
+          # 1.2.3 -> 10203. Always increases with the version, so updates install over older builds.
+          CODE=$(node -e "const v=require('./app.json').expo.version.split('.').map(Number);const [a,b,c]=v;if(v.length!==3||v.some(n=>!Number.isInteger(n)||n<0)||b>99||c>99){console.error('version must be MAJOR.MINOR.PATCH with MINOR, PATCH <= 99');process.exit(1)}console.log(a*10000+b*100+c)")
+          node -e "const fs=require('fs');const j=require('./app.json');j.expo.android.versionCode=$CODE;fs.writeFileSync('app.json',JSON.stringify(j,null,2))"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building $VERSION (versionCode $CODE)"
+
+      - name: Configure release signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [[ -z "$KEYSTORE_BASE64" || -z "$STORE_PASSWORD" || -z "$KEY_ALIAS" || -z "$KEY_PASSWORD" ]]; then
+            echo "::error::Signing secrets are missing; refusing to publish a debug-signed APK."
+            exit 1
+          fi
+          KEYSTORE="$RUNNER_TEMP/upload.keystore"
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          mkdir -p ~/.gradle
+          {
+            echo "LOCALTUNES_UPLOAD_STORE_FILE=$KEYSTORE"
+            echo "LOCALTUNES_UPLOAD_STORE_PASSWORD=$STORE_PASSWORD"
+            echo "LOCALTUNES_UPLOAD_KEY_ALIAS=$KEY_ALIAS"
+            echo "LOCALTUNES_UPLOAD_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> ~/.gradle/gradle.properties
+
+      - name: Generate native project
+        run: npx expo prebuild --platform android --no-install
+        env:
+          CI: 1
+
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew app:assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a --no-daemon
+
+      - name: Verify signature
+        id: apk
+        run: |
+          APK="LocalTunes-${{ steps.version.outputs.version }}.apk"
+          mv android/app/build/outputs/apk/release/app-release.apk "$APK"
+          BUILD_TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BUILD_TOOLS/apksigner" verify --print-certs "$APK" | tee signer.txt
+          if grep -q "CN=Android Debug" signer.txt; then
+            echo "::error::APK is debug-signed"
+            exit 1
+          fi
+          echo "path=$APK" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "$APK" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "cert=$(grep -m1 'certificate SHA-256 digest' signer.txt | awk '{print $NF}')" >> "$GITHUB_OUTPUT"
+
+      - name: Upload workflow artifact
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v5
+        with:
+          name: ${{ steps.apk.outputs.path }}
+          path: ${{ steps.apk.outputs.path }}
+          retention-days: 14
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<EOF
+          ### Install
+          1. Download \`${{ steps.apk.outputs.path }}\` below on your Android phone.
+          2. Open it and allow "Install unknown apps" for your browser or file manager when prompted.
+
+          Supports 64-bit and 32-bit ARM phones (\`arm64-v8a\`, \`armeabi-v7a\`).
+
+          ### Verify
+          - APK SHA-256: \`${{ steps.apk.outputs.sha256 }}\`
+          - Signing certificate SHA-256: \`${{ steps.apk.outputs.cert }}\`
+          EOF
+          gh release create "$GITHUB_REF_NAME" "${{ steps.apk.outputs.path }}" \
+            --title "LocalTunes ${{ steps.version.outputs.version }}" \
+            --notes-file notes.md --generate-notes --verify-tag

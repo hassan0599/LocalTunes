@@ -48,6 +48,8 @@ let lastMarkedKey = '';
 let lastPositionSave = 0;
 let pendingSeek: { index: number; seconds: number } | null = null;
 let setupPromise: Promise<void> | null = null;
+/** Set once the user starts something, so a slow queue restore never overrides their choice. */
+let userStartedPlayback = false;
 
 const get = usePlayer.getState;
 const set = usePlayer.setState;
@@ -75,13 +77,39 @@ function requirePlaylist(): AudioPlaylist {
   return playlist;
 }
 
+/**
+ * Run a non-essential native call (lock screen / notification). Their argument conversion
+ * can throw (e.g. artwork that isn't a valid URL), and an uncaught throw from a tap handler
+ * or status listener closes the app. Losing lock-screen metadata must never stop playback.
+ */
+function safely(label: string, fn: () => void) {
+  try {
+    fn();
+  } catch (e) {
+    console.warn(`playback: ${label} failed`, e);
+  }
+}
+
 // ---------------------------------------------------------------- native status → store
 
 function onStatus(s: AudioPlaylistStatus) {
+  // An exception escaping a native event listener is fatal in release builds.
+  try {
+    handleStatus(s);
+  } catch (e) {
+    console.warn('playback: status update failed', e);
+  }
+}
+
+function handleStatus(s: AudioPlaylistStatus) {
   if (rebuilding) return;
   const state = get();
+  // Native calls are synchronous but their status events reach JS later, so events from the
+  // middle of a rebuild (after clear(), between add()s) arrive once the new queue is set.
+  // Their indexes refer to a half-built playlist: don't let them move the current track.
+  const inSync = s.trackCount === state.queue.length;
 
-  if (s.currentIndex !== lastIndex && s.currentIndex >= 0 && s.currentIndex < state.queue.length) {
+  if (inSync && s.currentIndex !== lastIndex && s.currentIndex >= 0 && s.currentIndex < state.queue.length) {
     lastIndex = s.currentIndex;
     set({ index: s.currentIndex, position: 0 });
     updateLockScreen();
@@ -138,15 +166,17 @@ function updateLockScreen() {
   const { queue, index } = get();
   const meta = metadataFor(queue[index]);
   if (!lockScreenActive) {
-    p.setActiveForLockScreen(true, meta, {
-      showNextTrack: true,
-      showPreviousTrack: true,
-      showSeekForward: false,
-      showSeekBackward: false,
+    safely('setActiveForLockScreen', () => {
+      p.setActiveForLockScreen(true, meta, {
+        showNextTrack: true,
+        showPreviousTrack: true,
+        showSeekForward: false,
+        showSeekBackward: false,
+      });
+      lockScreenActive = true;
     });
-    lockScreenActive = true;
   } else {
-    p.updateLockScreenMetadata(meta);
+    safely('updateLockScreenMetadata', () => p.updateLockScreenMetadata(meta));
   }
 }
 
@@ -174,7 +204,15 @@ function rebuild(queue: Track[], index: number) {
 /** Play `tracks` starting at `startIndex` (album, playlist, search results…). */
 export function playTracks(tracks: Track[], startIndex = 0) {
   if (!tracks.length) return;
-  const p = requirePlaylist();
+  // A tap can land before setup has created the native playlist: play once it exists.
+  if (!playlist) {
+    void setupPromise?.then(() => playTracks(tracks, startIndex));
+    return;
+  }
+  // Callers look the tapped track up with indexOf; a list refreshed in between gives -1.
+  if (!Number.isInteger(startIndex) || startIndex < 0 || startIndex >= tracks.length) startIndex = 0;
+  userStartedPlayback = true;
+  const p = playlist;
   const { shuffle } = get();
   const queue = shuffle ? shuffleKeepingCurrent(tracks, startIndex) : tracks;
   const index = shuffle ? 0 : startIndex;
@@ -238,7 +276,7 @@ export function removeFromQueue(trackId: number) {
     const wasPlaying = get().isPlaying;
     rebuild(newQueue, newIndex);
     if (!newQueue.length) {
-      p.clearLockScreenControls();
+      safely('clearLockScreenControls', () => p.clearLockScreenControls());
       lockScreenActive = false;
     } else {
       updateLockScreen();
@@ -352,6 +390,8 @@ async function restoreQueue() {
   };
   const queue = (await getTracksByIds(db, saved.trackIds)).filter(playable);
   const originalQueue = (await getTracksByIds(db, saved.originalIds)).filter(playable);
+  // The user tapped a song while we were loading: keep what they chose.
+  if (userStartedPlayback) return;
   p.loop = toLoopMode(saved.repeat);
   set({ repeat: saved.repeat, shuffle: saved.shuffle });
   if (!queue.length) return;
