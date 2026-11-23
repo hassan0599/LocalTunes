@@ -2,7 +2,7 @@
   "expo": {
     "name": "localtunes",
     "slug": "localtunes",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -10,9 +10,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.localtunes.app",
       "infoPlist": {
-        "UIBackgroundModes": [
-          "audio"
-        ]
+        "UIBackgroundModes": ["audio"]
       }
     },
     "android": {
@@ -39,9 +37,7 @@
       [
         "expo-media-library",
         {
-          "granularPermissions": [
-            "audio"
-          ],
+          "granularPermissions": ["audio"],
           "photosPermission": false,
           "savePhotosPermission": false
         }
