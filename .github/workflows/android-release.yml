@@ -10,6 +10,9 @@
 #   ANDROID_KEYSTORE_PASSWORD store password
 #   ANDROID_KEY_ALIAS         key alias (localtunes)
 #   ANDROID_KEY_PASSWORD      key password
+# Optional:
+#   JAMENDO_CLIENT_ID         Jamendo API client id (devportal.jamendo.com). Enables Jamendo
+#                             downloads. It is embedded in the APK, so it is public, not secret.
 name: Android release APK
 
 on:
@@ -93,7 +96,14 @@ jobs:
 
       - name: Build release APK
         working-directory: android
-        run: ./gradlew app:assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a --no-daemon
+        env:
+          # Inlined into the JS bundle at build time; without it the Jamendo source is off.
+          EXPO_PUBLIC_JAMENDO_CLIENT_ID: ${{ secrets.JAMENDO_CLIENT_ID }}
+        run: |
+          if [[ -z "$EXPO_PUBLIC_JAMENDO_CLIENT_ID" ]]; then
+            echo "::warning::JAMENDO_CLIENT_ID secret is not set; this build will not offer Jamendo downloads."
+          fi
+          ./gradlew app:assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a --no-daemon
 
       - name: Verify signature
         id: apk
