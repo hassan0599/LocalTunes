@@ -1,5 +1,6 @@
 /** Building blocks for Discover screens: banners, rows, badges. */
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import type { ReactNode } from 'react';
@@ -15,7 +16,7 @@ import { toggleWishlist, useWishlist, type WishKind } from '@/state/wishlist';
 
 import { CoverImage } from '../CoverImage';
 import { IconButton } from '../IconButton';
-import { TOUCH, tileColor, useTheme } from '../theme';
+import { radius, shade, TOUCH, tileColor, useTheme } from '../theme';
 import { useCoverArt, type MbState } from './hooks';
 
 // ---------------------------------------------------------------- status
@@ -212,19 +213,21 @@ export function SectionTitle({ children }: { children: ReactNode }) {
   );
 }
 
-/** Colourful "browse" tile for a genre. */
+/** "Browse" tile for a genre: a two-tone diagonal of its palette colour, label at the foot. */
 export function GenreTile({ label, onPress }: { label: string; onPress: () => void }) {
+  const color = tileColor(label);
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.tile, { backgroundColor: tileColor(label), opacity: pressed ? 0.8 : 1 }]}
+      style={({ pressed }) => [styles.tile, { opacity: pressed ? 0.8 : 1 }]}
       accessibilityRole="button"
       accessibilityLabel={`Browse ${label}`}
     >
+      <LinearGradient colors={[color, shade(color, 0.35)]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+      <Ionicons name="musical-notes" size={20} color="rgba(255,255,255,0.55)" />
       <Text style={styles.tileText} numberOfLines={2}>
         {label.replace(/(^|\s)\S/g, (c) => c.toUpperCase())}
       </Text>
-      <View style={styles.tileShape} />
     </Pressable>
   );
 }
@@ -268,17 +271,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: '500' },
   sub: { fontSize: 13, marginTop: 2 },
   section: { fontSize: 18, fontWeight: '700', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 6 },
-  chip: { paddingHorizontal: 14, minHeight: 40, borderRadius: 20, justifyContent: 'center' },
-  tile: { flexBasis: '47%', flexGrow: 1, height: 96, borderRadius: 8, padding: 12, overflow: 'hidden' },
-  tileText: { color: '#fff', fontSize: 17, fontWeight: '800', maxWidth: '75%' },
-  tileShape: {
-    position: 'absolute',
-    right: -18,
-    bottom: -18,
-    width: 72,
-    height: 72,
-    borderRadius: 10,
-    backgroundColor: 'rgba(0,0,0,0.22)',
-    transform: [{ rotate: '25deg' }],
-  },
+  chip: { paddingHorizontal: 14, minHeight: 40, borderRadius: radius.md, justifyContent: 'center' },
+  tile: { flexBasis: '47%', flexGrow: 1, height: 96, borderRadius: radius.lg, padding: 12, overflow: 'hidden', justifyContent: 'space-between' },
+  tileText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });

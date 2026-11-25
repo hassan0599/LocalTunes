@@ -5,7 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLibraryMatcher, useMb } from '@/components/discover/hooks';
 import { InLibraryBadge, MbStatus, OfflineBanner, RemoteCover, WishlistButton } from '@/components/discover/parts';
 import { StackScreen } from '@/components/StackScreen';
-import { TOUCH, useTheme } from '@/components/theme';
+import { radius, TOUCH, useTheme } from '@/components/theme';
 import type { Track } from '@/db/queries';
 import { getReleaseGroup } from '@/services/musicbrainz/api';
 import { yearOf } from '@/services/musicbrainz/mappers';
@@ -127,10 +127,10 @@ export default function MbAlbumScreen() {
 
 const styles = StyleSheet.create({
   header: { alignItems: 'center', padding: 16, gap: 6 },
-  title: { fontSize: 22, fontWeight: '800', textAlign: 'center', marginTop: 8 },
+  title: { fontSize: 22, fontWeight: '700', textAlign: 'center', marginTop: 8 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
-  play: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: TOUCH, paddingHorizontal: 20, borderRadius: 22 },
-  get: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: TOUCH, paddingHorizontal: 16, borderRadius: 22, borderWidth: 1.5 },
+  play: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: TOUCH, paddingHorizontal: 20, borderRadius: radius.md },
+  get: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: TOUCH, paddingHorizontal: 16, borderRadius: radius.md, borderWidth: 1.5 },
   track: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, minHeight: 52, paddingVertical: 6 },
   pos: { width: 32, textAlign: 'right', fontVariant: ['tabular-nums'] },
   note: { fontSize: 13, padding: 16 },

@@ -2,12 +2,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image, StyleSheet, View } from 'react-native';
 
-import { useTheme } from './theme';
+import { artRadius, shade, useTheme } from './theme';
 
-/** 2×2 mosaic of the first covers, or a red gradient with a note when there are none. */
+/** 2×2 mosaic of the first covers, or an accent gradient with a note when there are none. */
 export function PlaylistCover({ covers, size }: { covers: string[]; size: number }) {
   const t = useTheme();
-  const r = Math.max(4, size * 0.04);
+  const r = artRadius(size);
   if (covers.length >= 4) {
     const half = size / 2;
     return (
@@ -22,7 +22,7 @@ export function PlaylistCover({ covers, size }: { covers: string[]; size: number
     return <Image source={{ uri: covers[0] }} style={{ width: size, height: size, borderRadius: r }} accessibilityIgnoresInvertColors />;
   }
   return (
-    <LinearGradient colors={[t.accent, '#5C1520']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.empty, { width: size, height: size, borderRadius: r }]}>
+    <LinearGradient colors={[t.accent, shade(t.accent, 0.55)]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.empty, { width: size, height: size, borderRadius: r }]}>
       <Ionicons name="musical-notes" size={size * 0.42} color="rgba(255,255,255,0.9)" />
     </LinearGradient>
   );

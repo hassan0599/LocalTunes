@@ -8,7 +8,7 @@ import { CoverImage } from '@/components/CoverImage';
 import { HeroGradient } from '@/components/ScreenHeader';
 import { LicenseChip } from '@/components/downloads/parts';
 import { IconButton } from '@/components/IconButton';
-import { useTheme } from '@/components/theme';
+import { radius, useTheme } from '@/components/theme';
 import { TRACK_ROW_HEIGHT, TrackRow } from '@/components/TrackRow';
 import {
   cycleRepeat,
@@ -50,7 +50,7 @@ export default function PlayerScreen() {
       <HeroGradient height={700} color={t.heroTop} />
       <View style={styles.topBar}>
         <IconButton icon="chevron-down" label="Close player" onPress={() => router.back()} size={28} />
-        <Text style={[styles.topLabel, { color: t.textMuted }]}>Now Playing</Text>
+        <Text style={[styles.topLabel, { color: t.textMuted }]}>Now playing</Text>
         <View style={{ width: 44 }} />
       </View>
 
@@ -75,7 +75,7 @@ export default function PlayerScreen() {
               minimumValue={0}
               maximumValue={Math.max(total, 0.1)}
               value={Math.min(shown, total || 0)}
-              minimumTrackTintColor={t.text}
+              minimumTrackTintColor={t.accent}
               maximumTrackTintColor={"rgba(255,255,255,0.25)"}
               thumbTintColor={t.text}
               onSlidingStart={(v) => setScrubbing(v)}
@@ -105,9 +105,9 @@ export default function PlayerScreen() {
                 icon={isPlaying ? 'pause' : 'play'}
                 label={isPlaying ? 'Pause' : 'Play'}
                 size={36}
-                color="#000"
+                color={t.onAccent}
                 onPress={togglePlay}
-                style={[styles.playBtn, { backgroundColor: t.text }]}
+                style={[styles.playBtn, { backgroundColor: t.accent }]}
               />
               <IconButton icon="play-skip-forward" label="Next song" size={32} onPress={skipToNext} disabled={!hasNext} />
               <IconButton
@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   center: { alignItems: 'center', justifyContent: 'center' },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8 },
-  topLabel: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
+  topLabel: { fontSize: 14, fontWeight: '600' },
   main: { alignItems: 'center', paddingHorizontal: 24, paddingTop: 16 },
   meta: { alignSelf: 'stretch', marginTop: 24, gap: 4 },
   title: { fontSize: 22, fontWeight: '700' },
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   times: { alignSelf: 'stretch', flexDirection: 'row', justifyContent: 'space-between' },
   time: { fontSize: 12, fontVariant: ['tabular-nums'] },
   controls: { alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },
-  playBtn: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
+  playBtn: { width: 72, height: 72, borderRadius: radius.lg + 6, alignItems: 'center', justifyContent: 'center' },
   repeatOne: { fontSize: 12, marginTop: 4 },
   upNext: { alignSelf: 'stretch', fontSize: 17, fontWeight: '700', marginTop: 32, marginBottom: 4 },
 });

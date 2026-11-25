@@ -13,7 +13,7 @@ import { selectCurrentTrack, usePlayer } from '@/state/player';
 import { MiniPlayer } from './MiniPlayer';
 import { HeroGradient } from './ScreenHeader';
 import type { SheetOption } from './Sheet';
-import { TOUCH, useTheme } from './theme';
+import { radius, TOUCH, useTheme } from './theme';
 import { showTrackActions } from './trackActions';
 import { TRACK_ROW_HEIGHT, TrackRow } from './TrackRow';
 
@@ -32,7 +32,7 @@ interface Props {
   empty?: ReactNode;
 }
 
-/** Album, artist and playlist pages: red-tinted hero, big play button, track list, mini player. */
+/** Album, artist and playlist pages: artwork hero, Play/Shuffle buttons, track list, mini player. */
 export function TrackListScreen({ title, tracks, art, subtitle, actions, extraActions, numbered, empty }: Props) {
   const t = useTheme();
   const db = useSQLiteContext();
@@ -65,21 +65,22 @@ export function TrackListScreen({ title, tracks, art, subtitle, actions, extraAc
               <Pressable
                 onPress={() => playTracksShuffled(tracks)}
                 disabled={!tracks.length}
-                hitSlop={8}
-                style={styles.shuffle}
+                style={({ pressed }) => [styles.btn, { backgroundColor: pressed ? t.elevated : t.surface, opacity: tracks.length ? 1 : 0.4 }]}
                 accessibilityRole="button"
                 accessibilityLabel={`Shuffle play ${title}`}
               >
-                <Ionicons name="shuffle" size={28} color={tracks.length ? t.accent : t.textFaint} />
+                <Ionicons name="shuffle" size={20} color={t.text} />
+                <Text style={[styles.btnText, { color: t.text }]}>Shuffle</Text>
               </Pressable>
               <Pressable
                 onPress={() => playTracks(tracks, 0)}
                 disabled={!tracks.length}
-                style={({ pressed }) => [styles.play, { backgroundColor: pressed ? t.accentPressed : t.accent, opacity: tracks.length ? 1 : 0.4 }]}
+                style={({ pressed }) => [styles.btn, { backgroundColor: pressed ? t.accentPressed : t.accent, opacity: tracks.length ? 1 : 0.4 }]}
                 accessibilityRole="button"
                 accessibilityLabel={`Play ${title}`}
               >
-                <Ionicons name="play" size={28} color={t.onAccent} style={{ marginLeft: 3 }} />
+                <Ionicons name="play" size={20} color={t.onAccent} />
+                <Text style={[styles.btnText, { color: t.onAccent }]}>Play</Text>
               </Pressable>
             </View>
           </View>
@@ -121,10 +122,10 @@ export function HeaderIconButton({ icon, label, onPress }: { icon: 'ellipsis-hor
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   hero: { alignItems: 'center', paddingHorizontal: 16, gap: 8 },
-  title: { alignSelf: 'stretch', fontSize: 26, fontWeight: '800', letterSpacing: -0.5, marginTop: 12 },
-  controls: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
+  title: { alignSelf: 'stretch', fontSize: 26, fontWeight: '700', marginTop: 12 },
+  controls: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
   leftActions: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  shuffle: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
-  play: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  btn: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: TOUCH, paddingHorizontal: 16, borderRadius: radius.md },
+  btnText: { fontSize: 15, fontWeight: '700' },
   iconBtn: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
 });

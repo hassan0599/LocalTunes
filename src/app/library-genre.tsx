@@ -4,7 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
-import { tileColor, useTheme } from '@/components/theme';
+import { artRadius, shade, tileColor, useTheme } from '@/components/theme';
 import { pickPlaylist } from '@/components/trackActions';
 import { HeaderIconButton, TrackListScreen } from '@/components/TrackListScreen';
 import { useLibraryQuery } from '@/components/useLibraryQuery';
@@ -24,7 +24,7 @@ export default function LibraryGenreScreen() {
       subtitle="Genre"
       tracks={tracks}
       art={
-        <LinearGradient colors={[color, '#121212']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.art}>
+        <LinearGradient colors={[color, shade(color, 0.6)]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.art}>
           <Text style={styles.artText} numberOfLines={2}>
             {name}
           </Text>
@@ -53,7 +53,7 @@ export default function LibraryGenreScreen() {
 }
 
 const styles = StyleSheet.create({
-  art: { width: 200, height: 200, borderRadius: 8, justifyContent: 'flex-end', padding: 14 },
-  artText: { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
+  art: { width: 200, height: 200, borderRadius: artRadius(200), justifyContent: 'flex-end', padding: 14 },
+  artText: { color: '#fff', fontSize: 28, fontWeight: '700' },
   discover: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 });

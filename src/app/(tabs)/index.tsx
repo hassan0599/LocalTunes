@@ -22,6 +22,7 @@ import { showPrompt } from '@/components/Sheet';
 import { createPlaylist, listPlaylists, type PlaylistSummary } from '@/db/playlists';
 import { IconButton } from '@/components/IconButton';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { SegmentedControl } from '@/components/SegmentedControl';
 import { TOUCH, useTheme } from '@/components/theme';
 import { showTrackActions } from '@/components/trackActions';
 import { TRACK_ROW_HEIGHT, TrackRow } from '@/components/TrackRow';
@@ -43,6 +44,13 @@ import { selectCurrentTrack, usePlayer } from '@/state/player';
 import { useScan } from '@/state/scan';
 
 type Section = 'songs' | 'playlists' | 'albums' | 'artists';
+
+const SECTIONS: { value: Section; label: string }[] = [
+  { value: 'songs', label: 'Songs' },
+  { value: 'playlists', label: 'Playlists' },
+  { value: 'albums', label: 'Albums' },
+  { value: 'artists', label: 'Artists' },
+];
 
 const LIST_HEADER_HEIGHT = 48;
 
@@ -87,27 +95,9 @@ export default function LibraryScreen() {
           )
         }
       />
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={{ flexGrow: 0 }}
-        contentContainerStyle={styles.segments}
-        accessibilityRole="tablist"
-      >
-        {(['songs', 'playlists', 'albums', 'artists'] as const).map((s) => (
-          <Pressable
-            key={s}
-            onPress={() => setSection(s)}
-            style={[styles.segment, { backgroundColor: section === s ? t.accent : t.surface }]}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: section === s }}
-          >
-            <Text style={{ color: section === s ? t.onAccent : t.text, fontWeight: '600' }}>
-              {s[0].toUpperCase() + s.slice(1)}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+      <View style={styles.segments}>
+        <SegmentedControl options={SECTIONS} value={section} onChange={setSection} />
+      </View>
       <DeviceMusicBanner />
 
       {section === 'songs' && <Songs sort={sort} onSort={() => setSort(SORT_NEXT[sort])} onImport={onImport} />}
@@ -324,8 +314,7 @@ function Artists() {
 const styles = StyleSheet.create({
   newPlaylist: { width: 56, height: 56, borderRadius: 4, alignItems: "center", justifyContent: "center" },
   screen: { flex: 1 },
-  segments: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
-  segment: { minHeight: 36, paddingHorizontal: 16, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  segments: { paddingBottom: 8 },
   listHeader: { height: LIST_HEADER_HEIGHT, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16 },
   sortBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: TOUCH, paddingLeft: 8 },
   empty: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },

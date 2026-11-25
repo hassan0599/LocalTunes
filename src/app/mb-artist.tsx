@@ -127,7 +127,7 @@ function Header({ artist, inLibrary }: { artist: MbArtistDetail; inLibrary: bool
 
 const styles = StyleSheet.create({
   header: { padding: 16, gap: 4 },
-  name: { fontSize: 28, fontWeight: '800' },
+  name: { fontSize: 28, fontWeight: '700' },
   libraryLink: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: TOUCH },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   link: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, minHeight: TOUCH },

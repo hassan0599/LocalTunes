@@ -19,7 +19,7 @@ export function MiniPlayer() {
   if (!track) return null;
   return (
     <View style={styles.outer}>
-      <View style={[styles.card, { backgroundColor: t.player }]}>
+      <View style={[styles.card, { backgroundColor: t.player, borderColor: t.border }]}>
         <Pressable
           style={styles.main}
           onPress={() => router.push('/player')}
@@ -38,8 +38,8 @@ export function MiniPlayer() {
         </Pressable>
         <IconButton icon={isPlaying ? 'pause' : 'play'} label={isPlaying ? 'Pause' : 'Play'} size={26} onPress={togglePlay} />
         <IconButton icon="play-skip-forward" label="Next song" size={22} onPress={skipToNext} disabled={!hasNext} />
-        <View style={[styles.progressTrack, { backgroundColor: 'rgba(255,255,255,0.18)' }]}>
-          <View style={[styles.progress, { width: `${progress * 100}%`, backgroundColor: t.text }]} />
+        <View style={[styles.progressTrack, { backgroundColor: t.border }]}>
+          <View style={[styles.progress, { width: `${progress * 100}%`, backgroundColor: t.accent }]} />
         </View>
       </View>
     </View>
@@ -48,11 +48,11 @@ export function MiniPlayer() {
 
 const styles = StyleSheet.create({
   outer: { paddingHorizontal: 8, paddingBottom: 6 },
-  card: { flexDirection: 'row', alignItems: 'center', paddingRight: 4, borderRadius: radius.md, overflow: 'hidden' },
+  card: { flexDirection: 'row', alignItems: 'center', paddingRight: 4, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   main: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingLeft: 8, minWidth: 0 },
   text: { flex: 1, minWidth: 0 },
   title: { fontSize: 14, fontWeight: '700' },
   artist: { fontSize: 13 },
-  progressTrack: { position: 'absolute', left: 8, right: 8, bottom: 0, height: 2, borderRadius: 1 },
-  progress: { height: 2, borderRadius: 1 },
+  progressTrack: { position: 'absolute', left: 0, right: 0, top: 0, height: 2 },
+  progress: { height: 2 },
 });
