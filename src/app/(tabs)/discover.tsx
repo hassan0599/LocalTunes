@@ -16,6 +16,7 @@ import {
 import { IconButton } from '@/components/IconButton';
 import { prefixMatches, tokenize } from '@/db/fts';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { SegmentedControl } from '@/components/SegmentedControl';
 import { TOUCH, useTheme } from '@/components/theme';
 import {
   GENRES,
@@ -59,18 +60,12 @@ export default function DiscoverScreen() {
         />
         {!!query && <IconButton icon="close-circle" label="Clear search" color={t.textMuted} size={20} onPress={() => setQuery('')} />}
       </View>
-      <View style={styles.kinds} accessibilityRole="tablist">
-        {KINDS.map((k) => (
-          <Pressable
-            key={k.kind}
-            onPress={() => setKind(k.kind)}
-            style={[styles.kind, { backgroundColor: kind === k.kind ? t.accent : t.surface }]}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: kind === k.kind }}
-          >
-            <Text style={{ color: kind === k.kind ? t.onAccent : t.text, fontWeight: '600' }}>{k.label}</Text>
-          </Pressable>
-        ))}
+      <View style={styles.kinds}>
+        <SegmentedControl
+          options={KINDS.map((k) => ({ value: k.kind, label: k.label }))}
+          value={kind}
+          onChange={setKind}
+        />
       </View>
       {/* Keyed so switching type or query never renders old results with the new row type. */}
       {q ? <Results key={`${kind}:${q}`} query={q} kind={kind} /> : <Home />}
@@ -156,9 +151,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   inputWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, paddingLeft: 12, borderRadius: 12, minHeight: TOUCH },
   input: { flex: 1, fontSize: 16, paddingVertical: 10 },
-  kinds: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
+  kinds: { paddingVertical: 10 },
   genreRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
-  kind: { minHeight: 36, paddingHorizontal: 16, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   wishRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, paddingHorizontal: 14, minHeight: 52, borderRadius: 12 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 16 },
   note: { fontSize: 13, paddingHorizontal: 16, paddingVertical: 24 },

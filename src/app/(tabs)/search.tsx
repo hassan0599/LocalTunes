@@ -8,7 +8,7 @@ import { CoverImage } from '@/components/CoverImage';
 import { IconButton } from '@/components/IconButton';
 import { parseCovers, PlaylistCover } from '@/components/PlaylistCover';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { TOUCH, tileColor, useTheme } from '@/components/theme';
+import { radius, TOUCH, tileColor, useTheme } from '@/components/theme';
 import { showTrackActions } from '@/components/trackActions';
 import { TrackRow } from '@/components/TrackRow';
 import { EMPTY_RESULTS, searchLibrary, type GenreSummary, type PlaylistHit, type SearchResults } from '@/db/fts';
@@ -101,21 +101,22 @@ export default function SearchScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: t.bg }]}>
       <ScreenHeader title="Search" />
-      <View style={[styles.inputWrap, { backgroundColor: "#FFFFFF" }]}>
-        <Ionicons name="search" size={22} color="#121212" />
+      <View style={[styles.inputWrap, { backgroundColor: t.surface, borderColor: t.border }]}>
+        <Ionicons name="search" size={20} color={t.textMuted} />
         <TextInput
           value={query}
           onChangeText={setQuery}
           placeholder="Songs, artists, genres, playlists"
-          placeholderTextColor="#535353"
-          style={[styles.input, { color: "#121212", fontWeight: "600" }]}
+          placeholderTextColor={t.textFaint}
+          selectionColor={t.accent}
+          style={[styles.input, { color: t.text }]}
           autoCorrect={false}
           autoCapitalize="none"
           returnKeyType="search"
           clearButtonMode="never"
           accessibilityLabel="Search your library"
         />
-        {hasQuery && <IconButton icon="close-circle" label="Clear search" color="#535353" size={20} onPress={() => setQuery('')} />}
+        {hasQuery && <IconButton icon="close-circle" label="Clear search" color={t.textMuted} size={20} onPress={() => setQuery('')} />}
       </View>
 
       {!hasQuery ? (
@@ -288,7 +289,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 8,
     paddingLeft: 12,
-    borderRadius: 12,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
     minHeight: TOUCH,
   },
   input: { flex: 1, fontSize: 16, paddingVertical: 10 },
@@ -300,7 +302,7 @@ const styles = StyleSheet.create({
   rowTitle: { fontSize: 16, fontWeight: '500' },
   more: { paddingHorizontal: 16, minHeight: TOUCH, justifyContent: 'center' },
   genreRow: { gap: 10, paddingHorizontal: 16, paddingVertical: 4 },
-  genreTile: { width: 140, height: 80, borderRadius: 8, padding: 10, justifyContent: 'space-between' },
-  genreName: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  genreTile: { width: 140, height: 80, borderRadius: radius.lg, padding: 10, justifyContent: 'space-between' },
+  genreName: { color: '#fff', fontSize: 16, fontWeight: '700' },
   genreCount: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600' },
 });

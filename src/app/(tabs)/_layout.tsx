@@ -19,10 +19,10 @@ export default function TabsLayout() {
     <Tabs style={{ flex: 1, backgroundColor: t.bg }}>
       <TabSlot style={{ flex: 1 }} />
       <View style={styles.playerWrap} pointerEvents="box-none">
-        <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.85)']} style={StyleSheet.absoluteFill} pointerEvents="none" />
+        <LinearGradient colors={[`${t.bg}00`, t.bg]} style={StyleSheet.absoluteFill} pointerEvents="none" />
         <MiniPlayer />
       </View>
-      <TabList style={[styles.bar, { backgroundColor: t.base, paddingBottom: insets.bottom }]}>
+      <TabList style={[styles.bar, { backgroundColor: t.bg, borderTopColor: t.border, paddingBottom: insets.bottom }]}>
         <TabTrigger name="index" href="/" asChild>
           <TabButton icon="library" label="Library" />
         </TabTrigger>
@@ -48,7 +48,7 @@ function TabButton({
   ...props
 }: TabTriggerSlotProps & { icon: IconName; label: string }) {
   const t = useTheme();
-  const color = isFocused ? t.text : t.textFaint;
+  const color = isFocused ? t.accent : t.textFaint;
   return (
     <Pressable
       {...props}
@@ -65,7 +65,7 @@ function TabButton({
 
 const styles = StyleSheet.create({
   playerWrap: { position: 'relative', marginTop: -12, paddingTop: 12 },
-  bar: { flexDirection: 'row' },
+  bar: { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth },
   tab: { flex: 1, minHeight: TOUCH + 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 6 },
   label: { fontSize: 11, marginTop: 3 },
 });

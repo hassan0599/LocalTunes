@@ -58,7 +58,7 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 140,
           "resizeMode": "contain",
-          "backgroundColor": "#121212"
+          "backgroundColor": "#0F1217"
         }
       ],
       "./plugins/withReleaseSigning"
@@ -67,6 +67,6 @@
     "experiments": {
       "typedRoutes": true
     },
-    "backgroundColor": "#121212"
+    "backgroundColor": "#0F1217"
   }
 }

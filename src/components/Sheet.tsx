@@ -141,7 +141,7 @@ function PromptModal({ spec }: { spec: PromptSpec | null }) {
                 style={[styles.dialogBtn, styles.primary, { backgroundColor: t.accent, opacity: value.trim() ? 1 : 0.4 }]}
                 accessibilityRole="button"
               >
-                <Text style={{ color: t.onAccent, fontWeight: '800' }}>{spec.confirmLabel}</Text>
+                <Text style={{ color: t.onAccent, fontWeight: '700' }}>{spec.confirmLabel}</Text>
               </Pressable>
             </View>
           </View>
@@ -153,7 +153,7 @@ function PromptModal({ spec }: { spec: PromptSpec | null }) {
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
-  sheet: { borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 8 },
+  sheet: { borderTopLeftRadius: radius.lg + 4, borderTopRightRadius: radius.lg + 4, paddingTop: 8 },
   grabber: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, marginBottom: 8 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 8 },
   title: { fontSize: 16, fontWeight: '700' },
@@ -162,9 +162,9 @@ const styles = StyleSheet.create({
   optionText: { fontSize: 16, fontWeight: '500' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: 24 },
   dialog: { alignSelf: 'stretch', borderRadius: radius.lg, padding: 20, gap: 16 },
-  dialogTitle: { fontSize: 20, fontWeight: '800', textAlign: 'center' },
+  dialogTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center' },
   input: { fontSize: 22, fontWeight: '700', textAlign: 'center', borderBottomWidth: 2, paddingVertical: 8 },
   dialogButtons: { flexDirection: 'row', justifyContent: 'center', gap: 12 },
-  dialogBtn: { minHeight: TOUCH, paddingHorizontal: 20, borderRadius: radius.pill, justifyContent: 'center' },
+  dialogBtn: { minHeight: TOUCH, paddingHorizontal: 20, borderRadius: radius.md, justifyContent: 'center' },
   primary: {},
 });
