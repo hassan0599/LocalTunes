@@ -1,12 +1,14 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import Slider from '@react-native-community/slider';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CoverImage } from '@/components/CoverImage';
 import { HeroGradient } from '@/components/ScreenHeader';
 import { LicenseChip } from '@/components/downloads/parts';
+import { PlayerExtras } from '@/components/PlayerExtras';
 import { IconButton } from '@/components/IconButton';
 import { radius, useTheme } from '@/components/theme';
 import { TRACK_ROW_HEIGHT, TrackRow } from '@/components/TrackRow';
@@ -119,11 +121,24 @@ export default function PlayerScreen() {
               />
             </View>
             {repeat === 'one' && <Text style={[styles.repeatOne, { color: t.accent }]}>Repeating this song</Text>}
+            <PlayerExtras />
 
             {upNext.length > 0 && (
-              <Text style={[styles.upNext, { color: t.text }]} accessibilityRole="header">
-                Up next
-              </Text>
+              <View style={styles.upNextRow}>
+                <Text style={[styles.upNext, { color: t.text }]} accessibilityRole="header">
+                  Up next
+                </Text>
+                <Pressable
+                  onPress={() => router.push('/queue')}
+                  hitSlop={8}
+                  style={styles.editQueue}
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit queue: reorder or remove upcoming songs"
+                >
+                  <Ionicons name="swap-vertical" size={16} color={t.accent} />
+                  <Text style={{ color: t.accent, fontWeight: '600' }}>Edit</Text>
+                </Pressable>
+              </View>
             )}
           </View>
         }
@@ -151,5 +166,7 @@ const styles = StyleSheet.create({
   controls: { alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },
   playBtn: { width: 72, height: 72, borderRadius: radius.lg + 6, alignItems: 'center', justifyContent: 'center' },
   repeatOne: { fontSize: 12, marginTop: 4 },
-  upNext: { alignSelf: 'stretch', fontSize: 17, fontWeight: '700', marginTop: 32, marginBottom: 4 },
+  upNextRow: { alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 32, marginBottom: 4 },
+  upNext: { fontSize: 17, fontWeight: '700' },
+  editQueue: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44, paddingHorizontal: 4 },
 });

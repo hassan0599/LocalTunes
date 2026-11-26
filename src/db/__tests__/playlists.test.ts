@@ -10,6 +10,7 @@ import {
   deletePlaylist,
   listPlaylists,
   listPlaylistTracks,
+  moveInPlaylist,
   removeFromPlaylist,
   swapInPlaylist,
 } from '../playlists';
@@ -63,5 +64,31 @@ describe('playlists', () => {
     await deletePlaylist(db, pl);
     expect(await listPlaylists(db)).toEqual([]);
     expect((await db.getAllAsync('SELECT id FROM tracks')).length).toBe(4);
+  });
+
+  it('moves an entry by display index and renumbers positions', async () => {
+    const { db, ids, pl } = await setup();
+    await addToPlaylist(db, pl, ids); // A B C D
+    await moveInPlaylist(db, pl, 0, 2);
+    expect(await titles(db, pl)).toEqual(['B', 'C', 'A', 'D']);
+    await moveInPlaylist(db, pl, 3, 0);
+    expect(await titles(db, pl)).toEqual(['D', 'B', 'C', 'A']);
+    expect((await listPlaylistTracks(db, pl)).map((t) => t.position)).toEqual([0, 1, 2, 3]);
+  });
+
+  it('handles gaps from removals and duplicate songs', async () => {
+    const { db, ids, pl } = await setup();
+    await addToPlaylist(db, pl, [ids[0], ids[1], ids[0], ids[2]]); // A B A C
+    await removeFromPlaylist(db, pl, 1); // A _ A C
+    await moveInPlaylist(db, pl, 2, 0);
+    expect(await titles(db, pl)).toEqual(['C', 'A', 'A']);
+  });
+
+  it('ignores out-of-range moves', async () => {
+    const { db, ids, pl } = await setup();
+    await addToPlaylist(db, pl, [ids[0], ids[1]]);
+    await moveInPlaylist(db, pl, 0, 5);
+    await moveInPlaylist(db, pl, -1, 0);
+    expect(await titles(db, pl)).toEqual(['A', 'B']);
   });
 });

@@ -78,3 +78,16 @@ export async function pruneCache(db: SQLiteDatabase, graceDays = 30, now = Date.
   );
   return res.changes;
 }
+
+/** Saved Discover pages: how many and roughly how much space (text bytes). */
+export async function cacheStats(db: SQLiteDatabase): Promise<{ entries: number; bytes: number }> {
+  const row = await db.getFirstAsync<{ entries: number; bytes: number | null }>(
+    'SELECT COUNT(*) AS entries, SUM(length(json)) AS bytes FROM mb_cache',
+  );
+  return { entries: row?.entries ?? 0, bytes: row?.bytes ?? 0 };
+}
+
+/** Forget every saved Discover page; they are fetched again when next opened online. */
+export async function clearCache(db: SQLiteDatabase): Promise<number> {
+  return (await db.runAsync('DELETE FROM mb_cache')).changes;
+}

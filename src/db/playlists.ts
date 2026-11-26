@@ -80,3 +80,25 @@ export async function swapInPlaylist(db: SQLiteDatabase, id: number, a: number, 
     await db.runAsync('UPDATE playlist_tracks SET position = ? WHERE playlist_id = ? AND position = -1', b, id);
   });
 }
+
+/**
+ * Move the entry shown at index `from` to index `to` (display order), then renumber the
+ * playlist 0..n-1. Positions are the primary key, so they go negative first to avoid
+ * clashing while they're rewritten.
+ */
+export async function moveInPlaylist(db: SQLiteDatabase, id: number, from: number, to: number): Promise<void> {
+  if (from === to) return;
+  await db.withTransactionAsync(async () => {
+    const rows = await db.getAllAsync<{ rid: number }>(
+      'SELECT rowid AS rid FROM playlist_tracks WHERE playlist_id = ? ORDER BY position',
+      id,
+    );
+    if (from < 0 || from >= rows.length || to < 0 || to >= rows.length) return;
+    const [moved] = rows.splice(from, 1);
+    rows.splice(to, 0, moved);
+    for (let i = 0; i < rows.length; i++) {
+      await db.runAsync('UPDATE playlist_tracks SET position = ? WHERE rowid = ?', -(i + 1), rows[i].rid);
+    }
+    await db.runAsync('UPDATE playlist_tracks SET position = -position - 1 WHERE playlist_id = ?', id);
+  });
+}
