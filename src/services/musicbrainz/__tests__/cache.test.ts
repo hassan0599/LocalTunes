@@ -7,7 +7,7 @@
 import { openTestDb } from '@/db/testing/nodeDb';
 import { migrate } from '@/db/schema';
 
-import { cachedFetch, OfflineError, pruneCache } from '../cache';
+import { cachedFetch, cacheStats, clearCache, OfflineError, pruneCache } from '../cache';
 
 async function db() {
   const d = openTestDb();
@@ -55,5 +55,19 @@ describe('cachedFetch', () => {
     await cachedFetch(d, 'old', 60, async () => 1, { online: true, now: 0 });
     await cachedFetch(d, 'recent', 60, async () => 1, { online: true, now: 20 * day });
     expect(await pruneCache(d, 30, 40 * day)).toBe(1);
+  });
+});
+
+describe('cacheStats / clearCache', () => {
+  it('reports entries and text size, and clears everything', async () => {
+    const d = await db();
+    expect(await cacheStats(d)).toEqual({ entries: 0, bytes: 0 });
+    await cachedFetch(d, 'a', 60, async () => ({ name: 'Radiohead' }), { online: true, now: 0 });
+    await cachedFetch(d, 'b', 60, async () => [1, 2, 3], { online: true, now: 0 });
+    const stats = await cacheStats(d);
+    expect(stats.entries).toBe(2);
+    expect(stats.bytes).toBe(JSON.stringify({ name: 'Radiohead' }).length + JSON.stringify([1, 2, 3]).length);
+    expect(await clearCache(d)).toBe(2);
+    expect(await cacheStats(d)).toEqual({ entries: 0, bytes: 0 });
   });
 });

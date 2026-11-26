@@ -35,8 +35,10 @@ import {
   toLoopMode,
   type PersistedQueue,
 } from './queue';
+import { clampRate, fadeVolume } from './sleep';
 
 const QUEUE_KEY = 'player.queue';
+const RATE_KEY = 'player.rate';
 const POSITION_SAVE_INTERVAL_MS = 5000;
 
 let db: SQLiteDatabase | null = null;
@@ -50,6 +52,10 @@ let pendingSeek: { index: number; seconds: number } | null = null;
 let setupPromise: Promise<void> | null = null;
 /** Set once the user starts something, so a slow queue restore never overrides their choice. */
 let userStartedPlayback = false;
+/** Sleep timer: the 1 s ticker, the song an end-of-song timer waits for, the applied fade. */
+let sleepTicker: ReturnType<typeof setInterval> | null = null;
+let sleepTrackId: number | null = null;
+let sleepVolume = 1;
 
 const get = usePlayer.getState;
 const set = usePlayer.setState;
@@ -67,6 +73,7 @@ export function setupPlayback(database: SQLiteDatabase): Promise<void> {
     });
     playlist = createAudioPlaylist({ updateInterval: 500, loop: 'none' });
     playlist.addListener('playlistStatusUpdate', onStatus);
+    await restoreRate();
     await restoreQueue();
   })();
   return setupPromise;
@@ -110,6 +117,10 @@ function handleStatus(s: AudioPlaylistStatus) {
   const inSync = s.trackCount === state.queue.length;
 
   if (inSync && s.currentIndex !== lastIndex && s.currentIndex >= 0 && s.currentIndex < state.queue.length) {
+    // The armed song ended on its own and the next one started: stop here.
+    if (state.sleep?.kind === 'track' && sleepTrackId !== null && state.queue[s.currentIndex]?.id !== sleepTrackId) {
+      fireSleepTimer(true);
+    }
     lastIndex = s.currentIndex;
     set({ index: s.currentIndex, position: 0 });
     updateLockScreen();
@@ -128,6 +139,8 @@ function handleStatus(s: AudioPlaylistStatus) {
     position: s.currentTime,
     duration: s.duration > 0 ? s.duration : get().duration,
   });
+
+  if (inSync) checkTrackSleep(s);
 
   const track = get().queue[s.currentIndex];
   if (!track || !db) return;
@@ -218,6 +231,7 @@ export function playTracks(tracks: Track[], startIndex = 0) {
   const index = shuffle ? 0 : startIndex;
   pendingSeek = null;
   set({ queue, originalQueue: tracks, index, position: 0, duration: 0 });
+  rearmTrackSleep(queue[index]);
   rebuild(queue, index);
   updateLockScreen();
   p.play();
@@ -272,6 +286,7 @@ export function removeFromQueue(trackId: number) {
   if (newIndex >= newQueue.length) newIndex = Math.max(0, newQueue.length - 1);
 
   set({ queue: newQueue, originalQueue: originalQueue.filter((t) => t.id !== trackId), index: newIndex });
+  if (currentRemoved) rearmTrackSleep(newQueue[newIndex]);
   if (currentRemoved || !newQueue.length) {
     const wasPlaying = get().isPlaying;
     rebuild(newQueue, newIndex);
@@ -294,6 +309,51 @@ export function removeFromQueue(trackId: number) {
   void persistQueue();
 }
 
+/**
+ * Move an upcoming song from queue index `from` to `to` (both after the current song, so
+ * playback is never interrupted). The native playlist has no move, so it's remove + insert.
+ */
+export function moveInQueue(from: number, to: number) {
+  const p = playlist;
+  const { queue, originalQueue, index, shuffle } = get();
+  if (!p || from === to || from <= index || to <= index || from >= queue.length || to >= queue.length) return;
+  const newQueue = [...queue];
+  const [track] = newQueue.splice(from, 1);
+  newQueue.splice(to, 0, track);
+  rebuilding = true;
+  try {
+    p.remove(from);
+    p.insert(sourceFor(track), to);
+  } finally {
+    rebuilding = false;
+  }
+  // Without shuffle the play order *is* the original order, so keep them in step.
+  set({ queue: newQueue, originalQueue: shuffle ? originalQueue : newQueue });
+  void persistQueue();
+}
+
+/** Remove the upcoming song at queue index `at` (one entry, even if the song is queued twice). */
+export function removeQueueAt(at: number) {
+  const p = playlist;
+  const { queue, originalQueue, index, shuffle } = get();
+  if (!p || at <= index || at >= queue.length) return;
+  const removed = queue[at];
+  const newQueue = queue.filter((_, i) => i !== at);
+  rebuilding = true;
+  try {
+    p.remove(at);
+  } finally {
+    rebuilding = false;
+  }
+  let newOriginal = newQueue;
+  if (shuffle) {
+    const k = originalQueue.indexOf(removed);
+    newOriginal = k >= 0 ? originalQueue.filter((_, i) => i !== k) : originalQueue;
+  }
+  set({ queue: newQueue, originalQueue: newOriginal });
+  void persistQueue();
+}
+
 // ---------------------------------------------------------------- transport
 
 export function togglePlay() {
@@ -313,7 +373,10 @@ export function pause() {
 export function skipToNext() {
   const p = requirePlaylist();
   const { index, queue, repeat } = get();
-  if (index < queue.length - 1 || repeat === 'all') p.next();
+  if (index < queue.length - 1 || repeat === 'all') {
+    rearmTrackSleep(queue[index < queue.length - 1 ? index + 1 : 0]);
+    p.next();
+  }
 }
 
 export function skipToPrevious() {
@@ -321,12 +384,16 @@ export function skipToPrevious() {
   const { index, position, queue, repeat } = get();
   const target = previousIndex(index, position, queue.length, repeat);
   if (target === null) void p.seekTo(0);
-  else p.skipTo(target);
+  else {
+    rearmTrackSleep(queue[target]);
+    p.skipTo(target);
+  }
 }
 
 export function skipTo(index: number) {
   const p = requirePlaylist();
   if (index < 0 || index >= get().queue.length) return;
+  rearmTrackSleep(get().queue[index]);
   p.skipTo(index);
   if (!p.playing) p.play();
 }
@@ -357,6 +424,97 @@ export function toggleShuffle() {
   pendingSeek = position > 0 ? { index: newIndex, seconds: position } : null;
   if (isPlaying) requirePlaylist().play();
   void persistQueue();
+}
+
+// ---------------------------------------------------------------- playback speed
+
+/** Set the playback speed (0.5–2×). It applies to every song until changed, and persists. */
+export function setPlaybackRate(rate: number) {
+  const r = clampRate(rate);
+  set({ rate: r });
+  const p = playlist;
+  if (p) safely('playbackRate', () => (p.playbackRate = r));
+  if (db) void setSetting(db, RATE_KEY, r);
+}
+
+async function restoreRate() {
+  if (!db) return;
+  const saved = await getSetting<number>(db, RATE_KEY);
+  if (saved != null && saved !== 1) setPlaybackRate(saved);
+}
+
+// ---------------------------------------------------------------- sleep timer
+
+/** Stop playback after `minutes`, fading out over the last few seconds. */
+export function startSleepTimer(minutes: number) {
+  clearSleep();
+  set({ sleep: { kind: 'time', endsAt: Date.now() + minutes * 60_000 } });
+  sleepTicker = setInterval(tickSleep, 1000);
+}
+
+/** Stop playback when the current song ends. */
+export function sleepAtEndOfTrack() {
+  clearSleep();
+  const { queue, index } = get();
+  sleepTrackId = queue[index]?.id ?? null;
+  set({ sleep: { kind: 'track' } });
+}
+
+export function cancelSleepTimer() {
+  clearSleep();
+}
+
+function clearSleep() {
+  if (sleepTicker) clearInterval(sleepTicker);
+  sleepTicker = null;
+  sleepTrackId = null;
+  applySleepVolume(1);
+  if (get().sleep) set({ sleep: null });
+}
+
+/** The user moved to another song: an end-of-song timer now waits for that one. */
+function rearmTrackSleep(next: Track | undefined) {
+  if (get().sleep?.kind === 'track') {
+    sleepTrackId = next?.id ?? null;
+    applySleepVolume(1);
+  }
+}
+
+function applySleepVolume(v: number) {
+  if (v === sleepVolume) return;
+  sleepVolume = v;
+  const p = playlist;
+  if (p) safely('volume', () => (p.volume = v));
+}
+
+/** Timed mode: runs every second (JS timers keep running while audio plays in the background). */
+export function tickSleep(now = Date.now()) {
+  const sleep = get().sleep;
+  if (sleep?.kind !== 'time') return;
+  const remaining = sleep.endsAt - now;
+  if (remaining <= 0) fireSleepTimer(false);
+  else applySleepVolume(fadeVolume(remaining));
+}
+
+/** End-of-song mode: fade over the song's last seconds, stop just before it ends. */
+function checkTrackSleep(s: AudioPlaylistStatus) {
+  const { sleep, queue } = get();
+  if (sleep?.kind !== 'track' || !s.isLoaded || s.duration <= 0) return;
+  if (queue[s.currentIndex]?.id !== sleepTrackId) return;
+  const remainingMs = ((s.duration - s.currentTime) * 1000) / (get().rate || 1);
+  // Status arrives every 500 ms, so stop inside the last 600 ms rather than miss the end.
+  if (remainingMs <= 600) fireSleepTimer(false);
+  else applySleepVolume(fadeVolume(remainingMs));
+}
+
+/** Pause, restore the volume and clear the timer. `rewind`: the next song already started. */
+function fireSleepTimer(rewind: boolean) {
+  const p = playlist;
+  if (p) {
+    safely('pause', () => p.pause());
+    if (rewind) void p.seekTo(0).catch(() => {});
+  }
+  clearSleep();
 }
 
 // ---------------------------------------------------------------- persistence

@@ -87,6 +87,10 @@ export default function RootLayout() {
           <Stack.Screen name="wishlist" options={{ title: 'Wishlist' }} />
           <Stack.Screen name="get" options={{ title: 'Get music' }} />
           <Stack.Screen name="playlist" options={{ title: 'Playlist' }} />
+          <Stack.Screen name="smart-playlist" options={{ title: 'Smart playlist' }} />
+          <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+          <Stack.Screen name="playlist-reorder" options={{ title: 'Reorder' }} />
+          <Stack.Screen name="queue" options={{ title: 'Queue' }} />
           <Stack.Screen name="library-genre" options={{ title: 'Genre' }} />
         </Stack>
         <SheetHost />

@@ -11,6 +11,9 @@ const mockNative = {
   listener: null as Listener | null,
   pending: [] as Record<string, unknown>[],
   lockScreenThrows: false,
+  paused: true,
+  seeks: [] as number[],
+  obj: null as null | ({ volume: number; playbackRate: number } & Record<string, unknown>),
 };
 function mockEmit(extra: Record<string, unknown> = {}) {
   mockNative.pending.push({
@@ -31,7 +34,7 @@ function flush() {
 
 jest.mock('expo-audio', () => ({
   setAudioModeAsync: jest.fn(async () => {}),
-  createAudioPlaylist: jest.fn(() => ({
+  createAudioPlaylist: jest.fn(() => (mockNative.obj = {
     addListener: (_: string, l: Listener) => (mockNative.listener = l),
     clear: () => {
       mockNative.items = [];
@@ -54,9 +57,17 @@ jest.mock('expo-audio', () => ({
       if (i >= 0 && i < mockNative.items.length) mockNative.index = i;
       mockEmit();
     },
-    play: () => mockEmit(),
-    pause: () => mockEmit({ playing: false }),
-    seekTo: async () => {},
+    play: () => {
+      mockNative.paused = false;
+      mockEmit();
+    },
+    pause: () => {
+      mockNative.paused = true;
+      mockEmit({ playing: false });
+    },
+    seekTo: async (sec: number) => {
+      mockNative.seeks.push(sec);
+    },
     setActiveForLockScreen: () => {
       if (mockNative.lockScreenThrows) throw new Error('java.net.MalformedURLException: unknown protocol: content');
     },
@@ -66,6 +77,8 @@ jest.mock('expo-audio', () => ({
     clearLockScreenControls: () => {},
     playing: false,
     loop: 'none',
+    volume: 1,
+    playbackRate: 1,
   })),
 }));
 jest.mock('expo-file-system', () => ({ File: class { exists = true; } }));
@@ -88,15 +101,19 @@ async function load() {
   mockNative.pending = [];
   mockNative.listener = null;
   mockNative.lockScreenThrows = false;
+  mockNative.paused = true;
+  mockNative.seeks = [];
   let svc!: typeof import('../PlaybackService');
   let usePlayer!: typeof import('@/state/player').usePlayer;
+  let queries!: { setSetting: jest.Mock };
   /* eslint-disable @typescript-eslint/no-require-imports -- isolateModules needs require() */
   jest.isolateModules(() => {
     svc = require('../PlaybackService');
     usePlayer = require('@/state/player').usePlayer;
+    queries = require('@/db/queries');
   });
   /* eslint-enable @typescript-eslint/no-require-imports */
-  return { svc, usePlayer };
+  return { svc, usePlayer, queries };
 }
 
 describe('PlaybackService tap path', () => {
@@ -149,3 +166,147 @@ describe('PlaybackService tap path', () => {
     expect(usePlayer.getState().queue[usePlayer.getState().index]?.id).toBe(3);
   });
 });
+
+describe('playback speed', () => {
+  it('clamps, applies natively and persists', async () => {
+    const { svc, usePlayer, queries } = await load();
+    await svc.setupPlayback({} as never);
+    svc.setPlaybackRate(1.5);
+    expect(mockNative.obj?.playbackRate).toBe(1.5);
+    expect(usePlayer.getState().rate).toBe(1.5);
+    svc.setPlaybackRate(9);
+    expect(mockNative.obj?.playbackRate).toBe(2);
+    expect(queries.setSetting).toHaveBeenLastCalledWith({}, 'player.rate', 2);
+  });
+});
+
+describe('sleep timer', () => {
+  const status = (extra: Record<string, unknown>) =>
+    mockNative.listener?.({
+      currentIndex: mockNative.index,
+      trackCount: mockNative.items.length,
+      currentTime: 0,
+      duration: 100,
+      playing: true,
+      isBuffering: false,
+      isLoaded: true,
+      ...extra,
+    });
+
+  async function playing() {
+    const ctx = await load();
+    await ctx.svc.setupPlayback({} as never);
+    ctx.svc.playTracks(tracks, 0);
+    flush();
+    expect(mockNative.paused).toBe(false);
+    return ctx;
+  }
+
+  it('fades out over the last seconds, then pauses and restores volume', async () => {
+    jest.useFakeTimers({ now: 1_000_000 });
+    try {
+      const { svc, usePlayer } = await playing();
+      svc.startSleepTimer(1);
+      svc.tickSleep(1_000_000 + 30_000);
+      expect(mockNative.obj?.volume).toBe(1);
+      svc.tickSleep(1_000_000 + 55_000);
+      expect(mockNative.obj?.volume).toBe(0.5);
+      expect(mockNative.paused).toBe(false);
+      svc.tickSleep(1_000_000 + 60_000);
+      expect(mockNative.paused).toBe(true);
+      expect(mockNative.obj?.volume).toBe(1);
+      expect(usePlayer.getState().sleep).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('cancel restores the volume and clears the timer', async () => {
+    jest.useFakeTimers({ now: 0 });
+    try {
+      const { svc, usePlayer } = await playing();
+      svc.startSleepTimer(1);
+      svc.tickSleep(58_000);
+      expect(mockNative.obj?.volume).toBeLessThan(1);
+      svc.cancelSleepTimer();
+      expect(mockNative.obj?.volume).toBe(1);
+      expect(usePlayer.getState().sleep).toBeNull();
+      expect(mockNative.paused).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('end of song: stops just before the armed song ends', async () => {
+    const { svc, usePlayer } = await playing();
+    svc.sleepAtEndOfTrack();
+    status({ currentTime: 95 });
+    expect(mockNative.obj?.volume).toBe(0.5);
+    status({ currentTime: 99.6 });
+    expect(mockNative.paused).toBe(true);
+    expect(usePlayer.getState().sleep).toBeNull();
+    expect(mockNative.obj?.volume).toBe(1);
+  });
+
+  it('end of song: pauses and rewinds if the next song already started', async () => {
+    const { svc } = await playing();
+    svc.sleepAtEndOfTrack();
+    mockNative.index = 1; // advanced on its own between status updates
+    status({ currentTime: 0.3 });
+    expect(mockNative.paused).toBe(true);
+    expect(mockNative.seeks).toContain(0);
+  });
+
+  it('end of song: a manual skip moves the timer to the new song', async () => {
+    const { svc, usePlayer } = await playing();
+    svc.sleepAtEndOfTrack();
+    svc.skipTo(2);
+    flush();
+    status({ currentTime: 10 });
+    expect(mockNative.paused).toBe(false);
+    expect(usePlayer.getState().sleep).toEqual({ kind: 'track' });
+  });
+});
+
+describe('queue editing', () => {
+  async function playing(start = 0) {
+    const ctx = await load();
+    await ctx.svc.setupPlayback({} as never);
+    ctx.svc.playTracks(tracks, start);
+    flush();
+    return ctx;
+  }
+  const ids = (q: { id: number }[]) => q.map((t) => t.id);
+  const nativeIds = () => (mockNative.items as { uri: string }[]).map((s) => Number(s.uri.match(/(\d+)\.mp3$/)![1]));
+
+  it('moves an upcoming song in JS and native order alike, without touching the current one', async () => {
+    const { svc, usePlayer } = await playing(1);
+    svc.moveInQueue(4, 2);
+    flush();
+    expect(ids(usePlayer.getState().queue)).toEqual([1, 2, 5, 3, 4]);
+    expect(nativeIds()).toEqual([1, 2, 5, 3, 4]);
+    expect(usePlayer.getState().index).toBe(1);
+    expect(mockNative.index).toBe(1);
+    expect(ids(usePlayer.getState().originalQueue)).toEqual([1, 2, 5, 3, 4]);
+  });
+
+  it('refuses moves that involve the current or earlier songs', async () => {
+    const { svc, usePlayer } = await playing(2);
+    svc.moveInQueue(1, 4);
+    svc.moveInQueue(4, 2);
+    svc.moveInQueue(3, 9);
+    expect(ids(usePlayer.getState().queue)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('removes one upcoming entry from JS and native', async () => {
+    const { svc, usePlayer } = await playing(0);
+    svc.removeQueueAt(2);
+    flush();
+    expect(ids(usePlayer.getState().queue)).toEqual([1, 2, 4, 5]);
+    expect(nativeIds()).toEqual([1, 2, 4, 5]);
+    expect(usePlayer.getState().index).toBe(0);
+    svc.removeQueueAt(0); // the current song: not allowed here
+    expect(usePlayer.getState().queue).toHaveLength(4);
+  });
+});
+

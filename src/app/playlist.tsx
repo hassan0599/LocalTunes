@@ -13,7 +13,6 @@ import {
   listPlaylistTracks,
   removeFromPlaylist,
   renamePlaylist,
-  swapInPlaylist,
   type PlaylistSummary,
 } from '@/db/playlists';
 import type { Track } from '@/db/queries';
@@ -35,6 +34,9 @@ export default function PlaylistScreen() {
       title: name,
       subtitle: 'Playlist',
       options: [
+        ...(entries.length > 1
+          ? [{ label: 'Reorder songs', icon: 'swap-vertical' as const, onPress: () => router.push({ pathname: '/playlist-reorder', params: { id: String(id) } }) }]
+          : []),
         {
           label: 'Rename',
           icon: 'pencil-outline',
@@ -76,30 +78,21 @@ export default function PlaylistScreen() {
       subtitle="Playlist"
       tracks={entries}
       art={<PlaylistCover covers={parseCovers(playlist?.covers ?? null)} size={220} />}
-      actions={<HeaderIconButton icon="ellipsis-horizontal" label={`Playlist options for ${name}`} onPress={menu} />}
+      actions={
+        <>
+          <HeaderIconButton icon="ellipsis-horizontal" label={`Playlist options for ${name}`} onPress={menu} />
+          {entries.length > 1 && (
+            <HeaderIconButton
+              icon="swap-vertical"
+              label={`Reorder songs in ${name}`}
+              onPress={() => router.push({ pathname: '/playlist-reorder', params: { id: String(id) } })}
+            />
+          )}
+        </>
+      }
       extraActions={(_, i) => {
         const entry = entries[i];
         const opts = [];
-        if (i > 0) {
-          opts.push({
-            label: 'Move up',
-            icon: 'arrow-up' as const,
-            onPress: async () => {
-              await swapInPlaylist(db, id, entry.position, entries[i - 1].position);
-              bump();
-            },
-          });
-        }
-        if (i < entries.length - 1) {
-          opts.push({
-            label: 'Move down',
-            icon: 'arrow-down' as const,
-            onPress: async () => {
-              await swapInPlaylist(db, id, entry.position, entries[i + 1].position);
-              bump();
-            },
-          });
-        }
         opts.push({
           label: 'Remove from this playlist',
           icon: 'remove-circle-outline' as const,

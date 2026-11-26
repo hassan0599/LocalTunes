@@ -69,6 +69,17 @@ export async function ignoreDeviceAsset(db: SQLiteDatabase, deviceId: string): P
   if (!ignored.includes(deviceId)) await setSetting(db, IGNORED_KEY, [...ignored, deviceId]);
 }
 
+/** How many device songs were deleted from the library (and are kept out of rescans). */
+export async function hiddenDeviceSongCount(db: SQLiteDatabase): Promise<number> {
+  return ((await getSetting<string[]>(db, IGNORED_KEY)) ?? []).length;
+}
+
+/** Bring back device songs deleted from the library: forget them, then rescan. */
+export async function restoreHiddenDeviceSongs(db: SQLiteDatabase): Promise<ScanResult> {
+  await setSetting(db, IGNORED_KEY, []);
+  return scanDevice(db, 'manual');
+}
+
 function permissionState(p: PermissionResponse): ScanPermission {
   if (p.granted) return 'granted';
   return p.canAskAgain ? 'undetermined' : 'denied';

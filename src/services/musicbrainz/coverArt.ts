@@ -56,3 +56,23 @@ export function getCoverArt(db: SQLiteDatabase, mbid: string, online: boolean): 
   }
   return p;
 }
+
+/** Bytes used by downloaded Discover cover art. */
+export function coverCacheBytes(): number {
+  try {
+    const d = dir();
+    return d.exists ? (d.size ?? 0) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Delete downloaded Discover cover art (it downloads again when shown online). */
+export function clearCoverCache(): void {
+  try {
+    const d = dir();
+    if (d.exists) d.delete();
+  } catch (e) {
+    console.warn('cover cache clear failed', e);
+  }
+}

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 import type { Track } from '@/db/queries';
 import type { RepeatMode } from '@/services/playback/queue';
+import type { SleepTimer } from '@/services/playback/sleep';
 
 /**
  * Observable player state. Written only by PlaybackService; UI reads it and
@@ -17,6 +18,10 @@ export interface PlayerState {
   duration: number; // seconds
   repeat: RepeatMode;
   shuffle: boolean;
+  /** Playback speed, 0.5..2 (1 = normal). */
+  rate: number;
+  /** Active sleep timer, if any. */
+  sleep: SleepTimer | null;
 }
 
 export const usePlayer = create<PlayerState>(() => ({
@@ -29,6 +34,8 @@ export const usePlayer = create<PlayerState>(() => ({
   duration: 0,
   repeat: 'off',
   shuffle: false,
+  rate: 1,
+  sleep: null,
 }));
 
 export const selectCurrentTrack = (s: PlayerState): Track | undefined => s.queue[s.index];

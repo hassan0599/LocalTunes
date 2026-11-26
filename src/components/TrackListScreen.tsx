@@ -110,7 +110,7 @@ function formatDuration(ms: number): string {
   return min >= 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`;
 }
 
-export function HeaderIconButton({ icon, label, onPress }: { icon: 'ellipsis-horizontal' | 'add-circle-outline'; label: string; onPress: () => void }) {
+export function HeaderIconButton({ icon, label, onPress }: { icon: 'ellipsis-horizontal' | 'add-circle-outline' | 'swap-vertical'; label: string; onPress: () => void }) {
   const t = useTheme();
   return (
     <Pressable onPress={onPress} hitSlop={8} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel={label}>

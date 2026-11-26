@@ -23,6 +23,8 @@ import { createPlaylist, listPlaylists, type PlaylistSummary } from '@/db/playli
 import { IconButton } from '@/components/IconButton';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { SegmentedControl } from '@/components/SegmentedControl';
+import { SmartPlaylistArt } from '@/components/SmartPlaylistArt';
+import { SMART_PLAYLISTS, smartPlaylistCounts } from '@/db/smartPlaylists';
 import { TOUCH, useTheme } from '@/components/theme';
 import { showTrackActions } from '@/components/trackActions';
 import { TRACK_ROW_HEIGHT, TrackRow } from '@/components/TrackRow';
@@ -91,7 +93,10 @@ export default function LibraryScreen() {
           importing ? (
             <ActivityIndicator color={t.accent} style={{ width: TOUCH }} accessibilityLabel="Importing" />
           ) : (
-            <IconButton icon="add-circle-outline" label="Import audio files" onPress={onImport} size={28} />
+            <>
+              <IconButton icon="add-circle-outline" label="Import audio files" onPress={onImport} size={28} />
+              <IconButton icon="settings-outline" label="Settings" onPress={() => router.push('/settings')} size={26} />
+            </>
           )
         }
       />
@@ -230,6 +235,7 @@ function Playlists() {
   const t = useTheme();
   const db = useSQLiteContext();
   const { data } = useLibraryQuery(listPlaylists, [], [] as PlaylistSummary[]);
+  const { data: smartCounts } = useLibraryQuery(smartPlaylistCounts, [], null as Awaited<ReturnType<typeof smartPlaylistCounts>> | null);
   const create = () =>
     showPrompt({
       title: "Give your playlist a name",
@@ -246,6 +252,7 @@ function Playlists() {
       data={data}
       keyExtractor={(p) => String(p.id)}
       ListHeaderComponent={
+        <>
         <Pressable
           style={({ pressed }) => [styles.artistRow, pressed && { backgroundColor: t.surface }]}
           onPress={create}
@@ -256,6 +263,29 @@ function Playlists() {
           </View>
           <Text style={{ color: t.text, fontSize: 16, fontWeight: "600" }}>New playlist</Text>
         </Pressable>
+        {SMART_PLAYLISTS.map((sp) => {
+          const n = smartCounts?.[sp.id];
+          return (
+            <Pressable
+              key={sp.id}
+              style={({ pressed }) => [styles.artistRow, pressed && { backgroundColor: t.surface }]}
+              onPress={() => router.push({ pathname: "/smart-playlist", params: { id: sp.id } })}
+              accessibilityRole="button"
+              accessibilityLabel={`${sp.name}, smart playlist${n != null ? `, ${n} songs` : ""}`}
+            >
+              <SmartPlaylistArt playlist={sp} size={56} />
+              <View style={{ flex: 1 }}>
+                <Text numberOfLines={1} style={{ color: t.text, fontSize: 16, fontWeight: "600" }}>
+                  {sp.name}
+                </Text>
+                <Text numberOfLines={1} style={{ color: t.textMuted, fontSize: 13 }}>
+                  Smart playlist{n != null ? ` · ${n} ${n === 1 ? "song" : "songs"}` : ""}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })}
+        </>
       }
       renderItem={({ item }) => (
         <Pressable
