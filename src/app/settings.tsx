@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { formatBytes } from '@/components/downloads/parts';
+import { showPrompt } from '@/components/Sheet';
 import { StackScreen } from '@/components/StackScreen';
 import { radius, TOUCH, useTheme } from '@/components/theme';
 import { setWifiOnly } from '@/services/downloads/manager';
@@ -14,8 +15,17 @@ import { clearCoverCache, coverCacheBytes } from '@/services/musicbrainz/coverAr
 import { getSetting, setSetting } from '@/db/queries';
 import { BackupError } from '@/services/backup/backup';
 import { exportBackup, pickAndRestore, type RestoreResult } from '@/services/backup/io';
+import {
+  connect,
+  disconnect,
+  flushListens,
+  pendingListenCount,
+  TOKEN_REJECTED_KEY,
+  USER_KEY,
+  validateToken,
+} from '@/services/listenbrainz/listenbrainz';
 import { clearLyrics, LYRICS_ONLINE_KEY } from '@/services/lyrics/lyrics';
-import { setNormalize, setPlaybackRate } from '@/services/playback/PlaybackService';
+import { refreshScrobbling, setNormalize, setPlaybackRate } from '@/services/playback/PlaybackService';
 import { useDownloads } from '@/state/downloads';
 import { useLibraryVersion } from '@/state/library';
 import { usePlayer } from '@/state/player';
@@ -23,7 +33,13 @@ import { loadWishlist } from '@/state/wishlist';
 
 const REPO_URL = 'https://github.com/hassan0599/LocalTunes';
 
-type Busy = 'scan' | 'restore' | 'cache' | 'backup' | 'import';
+type Busy = 'scan' | 'restore' | 'cache' | 'backup' | 'import' | 'listenbrainz';
+
+interface LbState {
+  user: string | null;
+  rejected: boolean;
+  pending: number;
+}
 
 export default function SettingsScreen() {
   const t = useTheme();
@@ -34,6 +50,7 @@ export default function SettingsScreen() {
   const [gainInfo, setGainInfo] = useState<{ tagged: number; total: number } | null>(null);
   const normalize = usePlayer((s) => s.normalize);
   const [lyricsOnline, setLyricsOnline] = useState(true);
+  const [lb, setLb] = useState<LbState>({ user: null, rejected: false, pending: 0 });
   const [busy, setBusy] = useState<Busy | null>(null);
 
   // Bumped after an action to re-read cache size and hidden-song count.
@@ -47,9 +64,11 @@ export default function SettingsScreen() {
       hiddenDeviceSongCount(db),
       db.getFirstAsync<{ tagged: number; total: number }>('SELECT COUNT(replay_gain_db) AS tagged, COUNT(*) AS total FROM tracks'),
       getSetting<boolean>(db, LYRICS_ONLINE_KEY),
+      Promise.all([getSetting<string>(db, USER_KEY), getSetting<boolean>(db, TOKEN_REJECTED_KEY), pendingListenCount(db)]),
     ]).then(
-      ([stats, hiddenCount, gains, lyricsSetting]) => {
+      ([stats, hiddenCount, gains, lyricsSetting, [lbUser, lbRejected, lbPending]]) => {
         if (!alive) return;
+        setLb({ user: lbUser, rejected: !!lbRejected, pending: lbPending });
         setLyricsOnline(lyricsSetting ?? true);
         setCacheBytes(stats.bytes + coverCacheBytes());
         setHidden(hiddenCount);
@@ -143,6 +162,54 @@ export default function SettingsScreen() {
       Alert.alert('Backup restored', lines.join('\n'));
     });
 
+  const connectListenBrainz = () =>
+    showPrompt({
+      title: 'Paste your ListenBrainz user token',
+      placeholder: 'User token',
+      confirmLabel: 'Connect',
+      onSubmit: (token) =>
+        void run('listenbrainz', async () => {
+          let user: string | null;
+          try {
+            user = await validateToken(token);
+          } catch {
+            Alert.alert('Couldn’t reach ListenBrainz', 'Check your connection and try again.');
+            return;
+          }
+          if (!user) {
+            Alert.alert('Token not accepted', 'Copy the user token from listenbrainz.org/settings and paste it exactly.');
+            return;
+          }
+          await connect(db, token, user);
+          await refreshScrobbling();
+          void flushListens(db);
+          Alert.alert('Connected', `Listens will be sent to ListenBrainz as ${user}.`);
+        }),
+    });
+
+  const sendNow = () =>
+    run('listenbrainz', async () => {
+      const r = await flushListens(db);
+      if (r.status === 'sent') Alert.alert('Sent', `${r.sent} ${r.sent === 1 ? 'listen' : 'listens'} sent to ListenBrainz.`);
+      else if (r.status === 'nothing') Alert.alert('All caught up', 'There are no listens waiting to be sent.');
+      else if (r.status === 'rejected') Alert.alert('Token not accepted', 'ListenBrainz no longer accepts your token. Disconnect and connect again with a new one.');
+      else if (r.status === 'retry-later') Alert.alert('Couldn’t send', 'LocalTunes will try again when you’re online.');
+    });
+
+  const disconnectListenBrainz = () =>
+    Alert.alert('Disconnect ListenBrainz?', lb.pending ? `${lb.pending} unsent ${lb.pending === 1 ? 'listen' : 'listens'} will be discarded.` : 'LocalTunes will stop sending listens.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Disconnect',
+        style: 'destructive',
+        onPress: () =>
+          run('listenbrainz', async () => {
+            await disconnect(db);
+            await refreshScrobbling();
+          }),
+      },
+    ]);
+
   const clear = () =>
     Alert.alert('Clear saved online data?', 'Discover pages, cover art and lyrics are looked up again next time you open them online. Your music is not affected.', [
       { text: 'Cancel', style: 'cancel' },
@@ -196,6 +263,52 @@ export default function SettingsScreen() {
               />
             }
           />
+        </Section>
+
+        <Section title="ListenBrainz">
+          {lb.user ? (
+            <>
+              <Row
+                icon={lb.rejected ? 'alert-circle-outline' : 'radio-outline'}
+                title={`Connected as ${lb.user}`}
+                subtitle={
+                  lb.rejected
+                    ? 'ListenBrainz no longer accepts the token. Disconnect and connect again.'
+                    : lb.pending
+                      ? `${lb.pending} ${lb.pending === 1 ? 'listen' : 'listens'} waiting to be sent`
+                      : 'Every listen has been sent'
+                }
+                onPress={() => void Linking.openURL(`https://listenbrainz.org/user/${encodeURIComponent(lb.user!)}/`)}
+                external
+              />
+              {lb.pending > 0 && !lb.rejected && (
+                <Row
+                  icon="send-outline"
+                  title="Send now"
+                  onPress={busy ? undefined : sendNow}
+                  right={busy === 'listenbrainz' ? <ActivityIndicator color={t.accent} /> : undefined}
+                />
+              )}
+              <Row icon="log-out-outline" title="Disconnect" onPress={busy ? undefined : disconnectListenBrainz} />
+            </>
+          ) : (
+            <>
+              <Row
+                icon="radio-outline"
+                title="Connect ListenBrainz"
+                subtitle="Send what you listen to to listenbrainz.org for stats and recommendations. Your listening history is public on your profile there."
+                onPress={busy ? undefined : connectListenBrainz}
+                right={busy === 'listenbrainz' ? <ActivityIndicator color={t.accent} /> : undefined}
+              />
+              <Row
+                icon="key-outline"
+                title="Find your user token"
+                subtitle="Sign in at listenbrainz.org, then open Settings"
+                onPress={() => void Linking.openURL('https://listenbrainz.org/settings/')}
+                external
+              />
+            </>
+          )}
         </Section>
 
         <Section title="Downloads">

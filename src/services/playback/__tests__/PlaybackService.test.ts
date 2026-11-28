@@ -82,6 +82,11 @@ jest.mock('expo-audio', () => ({
   })),
 }));
 jest.mock('expo-file-system', () => ({ File: class { exists = true; } }));
+jest.mock('@/services/listenbrainz/listenbrainz', () => ({
+  ...jest.requireActual('@/services/listenbrainz/listenbrainz'),
+  queueListen: jest.fn(async () => true),
+  flushListens: jest.fn(async () => ({ status: 'sent', sent: 1 })),
+}));
 jest.mock('@/db/queries', () => ({
   getSetting: jest.fn(async () => null),
   setSetting: jest.fn(async () => {}),
@@ -106,14 +111,16 @@ async function load() {
   let svc!: typeof import('../PlaybackService');
   let usePlayer!: typeof import('@/state/player').usePlayer;
   let queries!: { setSetting: jest.Mock };
+  let listenbrainz!: { queueListen: jest.Mock; flushListens: jest.Mock };
   /* eslint-disable @typescript-eslint/no-require-imports -- isolateModules needs require() */
   jest.isolateModules(() => {
     svc = require('../PlaybackService');
     usePlayer = require('@/state/player').usePlayer;
     queries = require('@/db/queries');
+    listenbrainz = require('@/services/listenbrainz/listenbrainz');
   });
   /* eslint-enable @typescript-eslint/no-require-imports */
-  return { svc, usePlayer, queries };
+  return { svc, usePlayer, queries, listenbrainz };
 }
 
 describe('PlaybackService tap path', () => {
@@ -346,3 +353,49 @@ describe('volume normalization', () => {
     }
   });
 });
+
+describe('ListenBrainz listens', () => {
+  const status = (currentIndex: number, currentTime: number, playing = true) =>
+    mockNative.listener?.({ currentIndex, trackCount: 2, currentTime, duration: 60, playing, isBuffering: false, isLoaded: true });
+  const song = (id: number) => ({ ...track(id), duration_ms: 60_000 }) as Track;
+
+  it('queues one listen after half the song has actually played', async () => {
+    const { svc, listenbrainz } = await load();
+    await svc.setupPlayback({} as never);
+    svc.setScrobbling(true);
+    svc.playTracks([song(1), song(2)], 0);
+    flush();
+    for (let t = 0; t <= 29; t += 0.5) status(0, t);
+    expect(listenbrainz.queueListen).not.toHaveBeenCalled();
+    for (let t = 29.5; t <= 40; t += 0.5) status(0, t);
+    expect(listenbrainz.queueListen).toHaveBeenCalledTimes(1);
+    expect(listenbrainz.queueListen.mock.calls[0][1]).toMatchObject({ id: 1, duration_ms: 60_000 });
+  });
+
+  it('does not count seeking ahead or paused time', async () => {
+    const { svc, listenbrainz } = await load();
+    await svc.setupPlayback({} as never);
+    svc.setScrobbling(true);
+    svc.playTracks([song(1), song(2)], 0);
+    flush();
+    status(0, 0);
+    status(0, 0.5);
+    status(0, 55); // seek near the end
+    for (let t = 55; t < 59; t += 0.5) status(0, t);
+    status(0, 59, false);
+    expect(listenbrainz.queueListen).not.toHaveBeenCalled();
+  });
+
+  it('counts each loop of repeat-one, and nothing while disconnected', async () => {
+    const { svc, listenbrainz } = await load();
+    await svc.setupPlayback({} as never);
+    svc.playTracks([song(1), song(2)], 0);
+    flush();
+    for (let t = 0; t <= 35; t += 0.5) status(0, t);
+    expect(listenbrainz.queueListen).not.toHaveBeenCalled(); // not connected
+    svc.setScrobbling(true);
+    for (let loop = 0; loop < 2; loop++) for (let t = 0; t <= 35; t += 0.5) status(0, t);
+    expect(listenbrainz.queueListen).toHaveBeenCalledTimes(2);
+  });
+});
+

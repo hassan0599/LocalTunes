@@ -1,10 +1,10 @@
 /// <reference types="jest" />
 
-jest.mock('expo-file-system', () => ({ File: class {}, Directory: class {}, Paths: {} }));
-
 import type { Track } from '@/db/queries';
 
 import { backfillUpdates } from '../tagBackfill';
+
+jest.mock('expo-file-system', () => ({ File: class {}, Directory: class {}, Paths: {} }));
 
 const row = (over: Partial<Track> = {}) =>
   ({

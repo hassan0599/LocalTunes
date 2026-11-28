@@ -14,6 +14,7 @@ import {
   SectionTitle,
 } from '@/components/discover/parts';
 import { IconButton } from '@/components/IconButton';
+import { useLibraryQuery } from '@/components/useLibraryQuery';
 import { prefixMatches, tokenize } from '@/db/fts';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { SegmentedControl } from '@/components/SegmentedControl';
@@ -25,7 +26,9 @@ import {
   searchReleaseGroups,
   type SearchKind,
 } from '@/services/musicbrainz/api';
+import { becauseYouListened, topArtists } from '@/services/musicbrainz/suggestions';
 import type { MbArtist, MbPage, MbRecording, MbReleaseGroup } from '@/services/musicbrainz/types';
+import { usePlaysVersion } from '@/state/library';
 import { useWishlist } from '@/state/wishlist';
 
 const KINDS: { kind: SearchKind; label: string }[] = [
@@ -89,6 +92,7 @@ function Home() {
         <Text style={{ color: t.textMuted }}>{wishCount}</Text>
         <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
       </Pressable>
+      <BecauseYouListened />
       <SectionTitle>Browse by genre</SectionTitle>
       <View style={styles.chips}>
         {GENRES.map((g) => (
@@ -100,6 +104,28 @@ function Home() {
         in your library.
       </Text>
     </ScrollView>
+  );
+}
+
+/** Artists similar to the one you play most, that aren't in your library yet. */
+function BecauseYouListened() {
+  const plays = usePlaysVersion((s) => s.version);
+  const { data: seeds } = useLibraryQuery((d) => topArtists(d, 1), [plays], [] as string[]);
+  const matcher = useLibraryMatcher();
+  const seed = seeds[0];
+  const state = useMb(
+    seed && matcher ? (ctx) => becauseYouListened(ctx, seed, (name) => matcher.hasArtist(name)) : null,
+    [seed ?? '', !!matcher],
+  );
+  const s = state.data;
+  if (!s) return null;
+  return (
+    <>
+      <SectionTitle>Because you listened to {s.seed.name}</SectionTitle>
+      {s.artists.map((a) => (
+        <ArtistRow key={a.id} artist={a} inLibrary={false} />
+      ))}
+    </>
   );
 }
 

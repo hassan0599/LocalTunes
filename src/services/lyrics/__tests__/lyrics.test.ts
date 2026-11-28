@@ -4,14 +4,14 @@
 /// <reference types="jest" />
 /// <reference types="node" />
 
-jest.mock('expo-constants', () => ({ __esModule: true, default: { expoConfig: { version: '1.2.0' } } }));
-jest.mock('expo-file-system', () => ({ File: class {}, Directory: class {}, Paths: {} }));
-
 import { insertTrack } from '@/db/queries';
 import { migrate } from '@/db/schema';
 import { openTestDb } from '@/db/testing/nodeDb';
 
 import { getLyrics, type LyricsDeps } from '../lyrics';
+
+jest.mock('expo-constants', () => ({ __esModule: true, default: { expoConfig: { version: '1.2.0' } } }));
+jest.mock('expo-file-system', () => ({ File: class {}, Directory: class {}, Paths: {} }));
 
 const DAY = 24 * 3600 * 1000;
 

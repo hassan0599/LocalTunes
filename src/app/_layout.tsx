@@ -9,11 +9,12 @@ import { useTheme } from '@/components/theme';
 import { DB_NAME, migrate } from '@/db/schema';
 import { installCrashRecorder, showLastCrashIfAny } from '@/services/crashLog';
 import { startDownloads } from '@/services/downloads/manager';
+import { flushListens } from '@/services/listenbrainz/listenbrainz';
 import { scanDevice, type ScanTrigger } from '@/services/media/deviceScan';
 import { backfillTags } from '@/services/media/tagBackfill';
 import { pruneCache } from '@/services/musicbrainz/cache';
 import { setupPlayback } from '@/services/playback/PlaybackService';
-import { startNetworkMonitoring } from '@/state/network';
+import { startNetworkMonitoring, useNetwork } from '@/state/network';
 import { loadWishlist } from '@/state/wishlist';
 
 // Install before anything else runs so even early fatal errors are recorded.
@@ -29,6 +30,11 @@ function Bootstrap({ children }: { children: ReactNode }) {
     loadWishlist(db).catch((e) => console.warn('wishlist load failed', e));
     pruneCache(db).catch((e) => console.warn('cache prune failed', e));
     const stopNetwork = startNetworkMonitoring();
+    // ListenBrainz: send listens queued while offline, now and whenever the connection returns.
+    void flushListens(db);
+    const stopListenFlush = useNetwork.subscribe((s, prev) => {
+      if (s.online && !prev.online) void flushListens(db);
+    });
     // Download queue resumes after restarts and when the connection returns (spec 2, rule 3).
     const stopDownloads = startDownloads(db).catch((e) => {
       console.warn('downloads start failed', e);
@@ -36,6 +42,7 @@ function Bootstrap({ children }: { children: ReactNode }) {
     });
     return () => {
       stopNetwork();
+      stopListenFlush();
       void stopDownloads.then((stop) => stop());
     };
   }, [db]);

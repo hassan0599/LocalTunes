@@ -26,7 +26,9 @@ import {
   setTrackDurationIfMissing,
   type Track,
 } from '@/db/queries';
+import { flushListens, isListen, queueListen, TOKEN_KEY } from '@/services/listenbrainz/listenbrainz';
 import { usePlaysVersion } from '@/state/library';
+import { useNetwork } from '@/state/network';
 import { usePlayer } from '@/state/player';
 
 import {
@@ -63,6 +65,9 @@ let sleepVolume = 1;
 let normVolume = 1;
 let libraryGain: number | null = null;
 let appliedVolume = 1;
+/** ListenBrainz: on while connected; progress of the current play through its song. */
+let scrobbling = false;
+let listen = { key: '', playedMs: 0, lastTime: 0, startedAt: 0, done: false };
 
 const get = usePlayer.getState;
 const set = usePlayer.setState;
@@ -82,6 +87,7 @@ export function setupPlayback(database: SQLiteDatabase): Promise<void> {
     playlist.addListener('playlistStatusUpdate', onStatus);
     await restoreRate();
     await restoreNormalize();
+    await refreshScrobbling();
     await restoreQueue();
   })();
   return setupPromise;
@@ -150,6 +156,7 @@ function handleStatus(s: AudioPlaylistStatus) {
   });
 
   if (inSync) checkTrackSleep(s);
+  if (inSync) trackListen(s);
 
   const track = get().queue[s.currentIndex];
   if (!track || !db) return;
@@ -566,6 +573,52 @@ function fireSleepTimer(rewind: boolean) {
     if (rewind) void p.seekTo(0).catch(() => {});
   }
   clearSleep();
+}
+
+// ---------------------------------------------------------------- ListenBrainz
+
+/** Re-read whether ListenBrainz is connected (after connecting or disconnecting). */
+export async function refreshScrobbling() {
+  if (!db) return;
+  try {
+    scrobbling = !!(await getSetting<string>(db, TOKEN_KEY));
+  } catch {
+    scrobbling = false;
+  }
+}
+
+/** Test hook and settings shortcut. */
+export function setScrobbling(enabled: boolean) {
+  scrobbling = enabled;
+}
+
+/**
+ * Count real progress through the current song (position deltas while playing, so seeking
+ * ahead doesn't count and speed changes do). A new occurrence starts on a track change or
+ * when repeat-one jumps back to the start.
+ */
+function trackListen(s: AudioPlaylistStatus) {
+  const track = get().queue[s.currentIndex];
+  if (!track) return;
+  const key = `${s.currentIndex}:${track.id}`;
+  const restarted = key === listen.key && s.currentTime + 5 < listen.lastTime;
+  if (key !== listen.key || restarted) {
+    listen = { key, playedMs: 0, lastTime: s.currentTime, startedAt: Date.now(), done: false };
+    return;
+  }
+  const delta = s.currentTime - listen.lastTime;
+  listen.lastTime = s.currentTime;
+  if (s.playing && delta > 0 && delta < 3) listen.playedMs += delta * 1000;
+  const durationMs = track.duration_ms ?? (s.duration > 0 ? s.duration * 1000 : null);
+  if (!listen.done && scrobbling && db && isListen(listen.playedMs, durationMs)) {
+    listen.done = true;
+    const database = db;
+    void queueListen(database, { ...track, duration_ms: durationMs }, listen.startedAt)
+      .then((queued) => {
+        if (queued && useNetwork.getState().online) return flushListens(database);
+      })
+      .catch((e) => console.warn('listenbrainz: queue failed', e));
+  }
 }
 
 // ---------------------------------------------------------------- persistence
