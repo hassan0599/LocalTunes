@@ -310,3 +310,18 @@ describe('base64ToBytes', () => {
   });
 });
 
+describe('embedded lyrics', () => {
+  it('reads ID3v2 USLT', async () => {
+    const uslt = id3Frame('USLT', bytes([3], 'eng', [0], utf8('[00:01.00]Første linje\n[00:03.00]Second')));
+    const tags = await readTags(source(bytes(id3v23(uslt), xingFrame(10))));
+    expect(tags.lyrics).toBe('[00:01.00]Første linje\n[00:03.00]Second');
+  });
+
+  it('reads LYRICS / UNSYNCEDLYRICS Vorbis comments', async () => {
+    const si = new Uint8Array(34);
+    const vc = vorbisComment(['UNSYNCEDLYRICS=Plain words']);
+    const file = bytes('fLaC', [0], be24(34), si, [0x84], be24(vc.length), vc, new Uint8Array(16));
+    expect((await readTags(source(file))).lyrics).toBe('Plain words');
+  });
+});
+

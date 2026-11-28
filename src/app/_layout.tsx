@@ -80,6 +80,7 @@ export default function RootLayout() {
         >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="player" options={{ presentation: 'modal', headerShown: false }} />
+          <Stack.Screen name="lyrics" options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen name="album" options={{ title: 'Album' }} />
           <Stack.Screen name="artist" options={{ title: 'Artist' }} />
           <Stack.Screen name="genre" options={{ title: 'Genre' }} />

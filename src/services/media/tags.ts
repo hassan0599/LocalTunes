@@ -33,6 +33,8 @@ export interface AudioTags {
   picture?: Picture;
   /** ReplayGain track gain in dB (negative = louder than the reference, turn down). */
   replayGainDb?: number;
+  /** Embedded lyrics: plain text, or LRC with [mm:ss.xx] timestamps. */
+  lyrics?: string;
 }
 
 const MAX_TAG_BYTES = 32 * 1024 * 1024;
@@ -164,6 +166,7 @@ async function readId3v2(src: ByteSource): Promise<{ tags: AudioTags; end: numbe
 
   const text: Record<string, string> = {};
   const userText: Record<string, string> = {};
+  let lyrics: string | undefined;
   const pictures: (Picture & { type: number })[] = [];
   const idLen = major === 2 ? 3 : 4;
   const hdrLen = major === 2 ? 6 : 10;
@@ -194,6 +197,10 @@ async function readId3v2(src: ByteSource): Promise<{ tags: AudioTags; end: numbe
       const term = enc === 1 || enc === 2 ? 2 : 1;
       const desc = decodeText(enc, data.subarray(1, Math.max(1, descEnd - term))).toUpperCase();
       if (desc && !(desc in userText)) userText[desc] = decodeText(enc, data.subarray(descEnd));
+    } else if ((id === 'USLT' || id === 'ULT') && lyrics === undefined && data.length > 4) {
+      // encoding, 3-byte language, terminated description, then the lyrics.
+      const enc = data[0];
+      lyrics = clean(decodeText(enc, data.subarray(skipTerminated(data, 4, enc))));
     } else if (id[0] === 'T') {
       text[id] = decodeText(data[0], data.subarray(1));
     } else if (id === 'APIC' || id === 'PIC') {
@@ -218,6 +225,7 @@ async function readId3v2(src: ByteSource): Promise<{ tags: AudioTags; end: numbe
       durationMs: Number.isFinite(tlen) && tlen > 0 ? tlen : undefined,
       picture: front ? { mime: front.mime, data: front.data } : undefined,
       replayGainDb: parseGainDb(userText.REPLAYGAIN_TRACK_GAIN),
+      lyrics: lyrics ?? clean(userText.LYRICS),
     },
   };
 }
@@ -406,6 +414,7 @@ function fromVorbisComments(c: Record<string, string>): AudioTags {
     trackNo: parseTrackNo(c.TRACKNUMBER),
     genre: parseGenre(c.GENRE),
     replayGainDb: parseGainDb(c.REPLAYGAIN_TRACK_GAIN) ?? (Number.isFinite(r128) ? sane(r128 / 256 + 5) : undefined),
+    lyrics: clean(c.LYRICS ?? c.UNSYNCEDLYRICS),
   };
 }
 
@@ -653,6 +662,9 @@ async function readMp4(src: ByteSource): Promise<AudioTags> {
         if (!out.picture && value.length) {
           out.picture = { mime: kind === 14 ? 'image/png' : 'image/jpeg', data: value };
         }
+        break;
+      case '©lyr':
+        out.lyrics = clean(utf8(value));
         break;
       case '----': {
         // Freeform: mean ("com.apple.iTunes") + name ("replaygain_track_gain") + data.

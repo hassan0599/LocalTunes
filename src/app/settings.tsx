@@ -11,8 +11,10 @@ import { setWifiOnly } from '@/services/downloads/manager';
 import { hiddenDeviceSongCount, restoreHiddenDeviceSongs, scanDevice, type ScanResult } from '@/services/media/deviceScan';
 import { cacheStats, clearCache } from '@/services/musicbrainz/cache';
 import { clearCoverCache, coverCacheBytes } from '@/services/musicbrainz/coverArt';
+import { getSetting, setSetting } from '@/db/queries';
 import { BackupError } from '@/services/backup/backup';
 import { exportBackup, pickAndRestore, type RestoreResult } from '@/services/backup/io';
+import { clearLyrics, LYRICS_ONLINE_KEY } from '@/services/lyrics/lyrics';
 import { setNormalize, setPlaybackRate } from '@/services/playback/PlaybackService';
 import { useDownloads } from '@/state/downloads';
 import { useLibraryVersion } from '@/state/library';
@@ -31,6 +33,7 @@ export default function SettingsScreen() {
   const [hidden, setHidden] = useState(0);
   const [gainInfo, setGainInfo] = useState<{ tagged: number; total: number } | null>(null);
   const normalize = usePlayer((s) => s.normalize);
+  const [lyricsOnline, setLyricsOnline] = useState(true);
   const [busy, setBusy] = useState<Busy | null>(null);
 
   // Bumped after an action to re-read cache size and hidden-song count.
@@ -43,9 +46,11 @@ export default function SettingsScreen() {
       cacheStats(db),
       hiddenDeviceSongCount(db),
       db.getFirstAsync<{ tagged: number; total: number }>('SELECT COUNT(replay_gain_db) AS tagged, COUNT(*) AS total FROM tracks'),
+      getSetting<boolean>(db, LYRICS_ONLINE_KEY),
     ]).then(
-      ([stats, hiddenCount, gains]) => {
+      ([stats, hiddenCount, gains, lyricsSetting]) => {
         if (!alive) return;
+        setLyricsOnline(lyricsSetting ?? true);
         setCacheBytes(stats.bytes + coverCacheBytes());
         setHidden(hiddenCount);
         setGainInfo(gains);
@@ -139,7 +144,7 @@ export default function SettingsScreen() {
     });
 
   const clear = () =>
-    Alert.alert('Clear saved Discover pages?', 'Artist pages, albums and cover art from Discover are downloaded again next time you open them online. Your music is not affected.', [
+    Alert.alert('Clear saved online data?', 'Discover pages, cover art and lyrics are looked up again next time you open them online. Your music is not affected.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Clear',
@@ -147,6 +152,7 @@ export default function SettingsScreen() {
         onPress: () =>
           run('cache', async () => {
             await clearCache(db);
+            await clearLyrics(db);
             clearCoverCache();
           }),
       },
@@ -170,6 +176,23 @@ export default function SettingsScreen() {
                 trackColor={{ true: t.accent, false: t.elevated }}
                 thumbColor="#FFFFFF"
                 accessibilityLabel="Normalize volume"
+              />
+            }
+          />
+          <Row
+            icon="document-text-outline"
+            title="Look up lyrics online"
+            subtitle="Searches LRCLIB by song title and artist when a song has no lyrics of its own"
+            right={
+              <Switch
+                value={lyricsOnline}
+                onValueChange={(v) => {
+                  setLyricsOnline(v);
+                  void setSetting(db, LYRICS_ONLINE_KEY, v);
+                }}
+                trackColor={{ true: t.accent, false: t.elevated }}
+                thumbColor="#FFFFFF"
+                accessibilityLabel="Look up lyrics online"
               />
             }
           />
@@ -231,9 +254,9 @@ export default function SettingsScreen() {
         <Section title="Storage">
           <Row
             icon="trash-outline"
-            title="Clear saved Discover pages"
-            subtitle={cacheBytes == null ? 'Calculating…' : cacheBytes > 0 ? `${formatBytes(cacheBytes)} of artist pages and cover art` : 'Nothing saved yet'}
-            onPress={busy || !cacheBytes ? undefined : clear}
+            title="Clear saved online data"
+            subtitle={cacheBytes == null ? 'Calculating…' : cacheBytes > 0 ? `${formatBytes(cacheBytes)} of Discover pages and cover art, plus saved lyrics` : 'Saved lyrics and Discover pages'}
+            onPress={busy ? undefined : clear}
             right={busy === 'cache' ? <ActivityIndicator color={t.accent} /> : undefined}
           />
         </Section>
