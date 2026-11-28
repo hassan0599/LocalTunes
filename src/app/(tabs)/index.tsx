@@ -17,6 +17,7 @@ import {
 
 import { CoverImage } from '@/components/CoverImage';
 import { DeviceMusicBanner } from '@/components/DeviceMusicBanner';
+import { FolderList } from '@/components/FolderList';
 import { parseCovers, PlaylistCover } from '@/components/PlaylistCover';
 import { showPrompt } from '@/components/Sheet';
 import { createPlaylist, listPlaylists, type PlaylistSummary } from '@/db/playlists';
@@ -45,13 +46,14 @@ import { useLibraryVersion, usePlaysVersion } from '@/state/library';
 import { selectCurrentTrack, usePlayer } from '@/state/player';
 import { useScan } from '@/state/scan';
 
-type Section = 'songs' | 'playlists' | 'albums' | 'artists';
+type Section = 'songs' | 'playlists' | 'albums' | 'artists' | 'folders';
 
 const SECTIONS: { value: Section; label: string }[] = [
   { value: 'songs', label: 'Songs' },
   { value: 'playlists', label: 'Playlists' },
   { value: 'albums', label: 'Albums' },
   { value: 'artists', label: 'Artists' },
+  { value: 'folders', label: 'Folders' },
 ];
 
 const LIST_HEADER_HEIGHT = 48;
@@ -109,6 +111,7 @@ export default function LibraryScreen() {
       {section === 'albums' && <Albums />}
       {section === 'artists' && <Artists />}
       {section === 'playlists' && <Playlists />}
+      {section === 'folders' && <FolderList path="" />}
     </View>
   );
 }

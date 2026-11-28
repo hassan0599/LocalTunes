@@ -93,6 +93,7 @@ export default function RootLayout() {
           <Stack.Screen name="settings" options={{ title: 'Settings' }} />
           <Stack.Screen name="playlist-reorder" options={{ title: 'Reorder' }} />
           <Stack.Screen name="queue" options={{ title: 'Queue' }} />
+          <Stack.Screen name="folder" options={{ title: 'Folder' }} />
           <Stack.Screen name="library-genre" options={{ title: 'Genre' }} />
         </Stack>
         <SheetHost />
