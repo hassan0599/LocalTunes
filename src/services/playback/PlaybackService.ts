@@ -31,6 +31,8 @@ import { usePlaysVersion } from '@/state/library';
 import { useNetwork } from '@/state/network';
 import { usePlayer } from '@/state/player';
 
+import { updateWidget } from '../../../modules/now-playing';
+
 import {
   nextRepeatMode,
   previousIndex,
@@ -85,6 +87,8 @@ export function setupPlayback(database: SQLiteDatabase): Promise<void> {
     });
     playlist = createAudioPlaylist({ updateInterval: 500, loop: 'none' });
     playlist.addListener('playlistStatusUpdate', onStatus);
+    // Home-screen widget follows the current song and play state (updates are de-duplicated).
+    usePlayer.subscribe(syncWidget);
     await restoreRate();
     await restoreNormalize();
     await refreshScrobbling();
@@ -176,6 +180,14 @@ function handleStatus(s: AudioPlaylistStatus) {
     lastPositionSave = now;
     void persistQueue();
   }
+}
+
+// ---------------------------------------------------------------- home-screen widget
+
+function syncWidget() {
+  const { queue, index, isPlaying } = get();
+  const t = queue[index];
+  updateWidget({ title: t?.title ?? null, artist: t?.artist ?? null, isPlaying: !!t && isPlaying, artworkUri: t?.artwork_uri ?? null });
 }
 
 // ---------------------------------------------------------------- lock screen

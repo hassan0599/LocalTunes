@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="np_widget_label">LocalTunes</string>
+  <string name="np_widget_description">What\'s playing, with play/pause and skip buttons</string>
+  <string name="np_nothing_playing">Nothing playing</string>
+  <string name="np_tap_to_open">Tap to open LocalTunes</string>
+  <string name="np_play">Play</string>
+  <string name="np_pause">Pause</string>
+  <string name="np_next">Next song</string>
+  <string name="np_previous">Previous song</string>
+</resources>

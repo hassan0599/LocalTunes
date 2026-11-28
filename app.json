@@ -10,7 +10,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.localtunes.app",
       "infoPlist": {
-        "UIBackgroundModes": ["audio"]
+        "UIBackgroundModes": [
+          "audio"
+        ]
       }
     },
     "android": {
@@ -37,7 +39,9 @@
       [
         "expo-media-library",
         {
-          "granularPermissions": ["audio"],
+          "granularPermissions": [
+            "audio"
+          ],
           "photosPermission": false,
           "savePhotosPermission": false
         }
@@ -61,7 +65,8 @@
           "backgroundColor": "#0F1217"
         }
       ],
-      "./plugins/withReleaseSigning"
+      "./plugins/withReleaseSigning",
+      "./plugins/withAndroidAuto"
     ],
     "scheme": "localtunes",
     "experiments": {
