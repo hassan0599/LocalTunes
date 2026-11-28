@@ -43,19 +43,15 @@ export default function SearchScreen() {
   const version = useLibraryVersion((s) => s.version);
   const currentId = usePlayer((s) => selectCurrentTrack(s)?.id);
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResults>(EMPTY_RESULTS);
-  const [searched, setSearched] = useState('');
+  const [lastResults, setResults] = useState<SearchResults>(EMPTY_RESULTS);
+  const [lastSearched, setSearched] = useState('');
   const [expanded, setExpanded] = useState<Record<Group, boolean>>({ albums: false, artists: false, playlists: false });
   const requestId = useRef(0);
 
   useEffect(() => {
     const id = ++requestId.current;
     const q = query.trim();
-    if (!q) {
-      setResults(EMPTY_RESULTS);
-      setSearched('');
-      return;
-    }
+    if (!q) return;
     const timer = setTimeout(async () => {
       try {
         const r = await searchLibrary(db, q);
@@ -71,6 +67,10 @@ export default function SearchScreen() {
     }, DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [db, query, version]);
+
+  // An empty box shows nothing, whatever the last search returned.
+  const results = query.trim() ? lastResults : EMPTY_RESULTS;
+  const searched = query.trim() ? lastSearched : '';
 
   const onSongPress = useCallback(
     (track: Track) => playTracks(results.songs, results.songs.indexOf(track)),

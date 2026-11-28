@@ -41,7 +41,7 @@ import {
 import { scanDevice } from '@/services/media/deviceScan';
 import { pickAndImport } from '@/services/media/importer';
 import { playTracks } from '@/services/playback/PlaybackService';
-import { useLibraryVersion } from '@/state/library';
+import { useLibraryVersion, usePlaysVersion } from '@/state/library';
 import { selectCurrentTrack, usePlayer } from '@/state/player';
 import { useScan } from '@/state/scan';
 
@@ -235,7 +235,8 @@ function Playlists() {
   const t = useTheme();
   const db = useSQLiteContext();
   const { data } = useLibraryQuery(listPlaylists, [], [] as PlaylistSummary[]);
-  const { data: smartCounts } = useLibraryQuery(smartPlaylistCounts, [], null as Awaited<ReturnType<typeof smartPlaylistCounts>> | null);
+  const plays = usePlaysVersion((s) => s.version);
+  const { data: smartCounts } = useLibraryQuery(smartPlaylistCounts, [plays], null as Awaited<ReturnType<typeof smartPlaylistCounts>> | null);
   const create = () =>
     showPrompt({
       title: "Give your playlist a name",

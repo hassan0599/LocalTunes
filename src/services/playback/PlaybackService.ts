@@ -26,6 +26,7 @@ import {
   setTrackDurationIfMissing,
   type Track,
 } from '@/db/queries';
+import { usePlaysVersion } from '@/state/library';
 import { usePlayer } from '@/state/player';
 
 import {
@@ -149,7 +150,7 @@ function handleStatus(s: AudioPlaylistStatus) {
     const key = `${s.currentIndex}:${track.id}`;
     if (key !== lastMarkedKey) {
       lastMarkedKey = key;
-      void markPlayed(db, track.id);
+      void markPlayed(db, track.id).then(() => usePlaysVersion.getState().bump(), () => {});
     }
   }
   if (s.isLoaded && s.duration > 0 && track.duration_ms == null) {

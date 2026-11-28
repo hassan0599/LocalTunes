@@ -39,19 +39,15 @@ export default function GetScreen() {
       ? { artist: params.artist, title: params.title, album: params.album === '1' }
       : { text: params.q ?? '' },
   );
-  const [state, setState] = useState<{ loading: boolean; results: SourceTrack[]; errors: string[] }>({
-    loading: true,
-    results: [],
-    errors: [],
-  });
+  // Results are tagged with the query they answer; until the current one answers, we're loading.
+  const requestKey = JSON.stringify(query);
+  const [done, setDone] = useState<{ key: string; results: SourceTrack[]; errors: string[] } | null>(null);
+  const current = online && done?.key === requestKey ? done : null;
+  const state = { loading: online && !current, results: current?.results ?? [], errors: current?.errors ?? [] };
 
   useEffect(() => {
-    if (!online) {
-      setState({ loading: false, results: [], errors: [] });
-      return;
-    }
+    if (!online) return;
     let alive = true;
-    setState({ loading: true, results: [], errors: [] });
     Promise.allSettled(enabledSources().map((s) => s.search(query))).then((settled) => {
       if (!alive) return;
       const results: SourceTrack[] = [];
@@ -60,12 +56,13 @@ export default function GetScreen() {
         if (r.status === 'fulfilled') results.push(...r.value);
         else errors.push(`${enabledSources()[i].name}: ${String(r.reason?.message ?? r.reason)}`);
       });
-      setState({ loading: false, results, errors });
+      setDone({ key: requestKey, results, errors });
     });
     return () => {
       alive = false;
     };
-  }, [query, online]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `query` is captured via requestKey
+  }, [requestKey, online]);
 
   const groups = useMemo(() => {
     const map = new Map<string, Group>();

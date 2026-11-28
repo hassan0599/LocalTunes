@@ -113,8 +113,13 @@ function utf8(b: Uint8Array): string {
 function utf16(b: Uint8Array, littleEndianDefault: boolean): string {
   let le = littleEndianDefault;
   let i = 0;
-  if (b.length >= 2 && b[0] === 0xff && b[1] === 0xfe) (le = true), (i = 2);
-  else if (b.length >= 2 && b[0] === 0xfe && b[1] === 0xff) (le = false), (i = 2);
+  if (b.length >= 2 && b[0] === 0xff && b[1] === 0xfe) {
+    le = true;
+    i = 2;
+  } else if (b.length >= 2 && b[0] === 0xfe && b[1] === 0xff) {
+    le = false;
+    i = 2;
+  }
   const units: number[] = [];
   for (; i + 1 < b.length; i += 2) units.push(le ? b[i] | (b[i + 1] << 8) : (b[i] << 8) | b[i + 1]);
   let s = '';
