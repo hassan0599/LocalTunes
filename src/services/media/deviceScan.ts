@@ -175,6 +175,7 @@ async function addAsset(db: SQLiteDatabase, meta: AssetMetadata): Promise<boolea
     album_artist: tags.albumArtist ?? null,
     track_no: tags.trackNo ?? fromName.trackNo ?? null,
     genre: tags.genre ?? null,
+    replay_gain_db: tags.replayGainDb ?? null,
     duration_ms: tags.durationMs ?? meta.duration ?? null,
     file_uri: uri,
     source: 'device',

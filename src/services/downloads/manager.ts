@@ -234,6 +234,7 @@ async function finalize(row: DownloadRow, file: File) {
     album_artist: tags.albumArtist ?? null,
     track_no: row.track_no ?? tags.trackNo ?? null,
     genre: tags.genre ?? row.genre ?? null,
+    replay_gain_db: tags.replayGainDb ?? null,
     duration_ms: tags.durationMs ?? row.duration_ms ?? null,
     file_uri: dest.uri,
     source: row.source as TrackSource,

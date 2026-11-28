@@ -2,8 +2,10 @@
  * Minimal audio tag reader (spec 6.1 "Metadata").
  *
  * Supports MP3 (ID3v2.2/2.3/2.4 + ID3v1, duration from Xing/Info/VBRI or CBR estimate),
- * FLAC (Vorbis comments, PICTURE, STREAMINFO duration) and MP4/M4A (ilst atoms, mvhd duration).
- * Anything else returns `{}` and the importer falls back to the file name.
+ * FLAC (Vorbis comments, PICTURE, STREAMINFO duration), MP4/M4A (ilst atoms, mvhd duration)
+ * and Ogg Vorbis / Opus (Vorbis comments, embedded pictures, duration from the last page).
+ * ReplayGain track gain is read from all of them (TXXX, Vorbis comments, R128 for Opus,
+ * iTunes freeform atoms). Anything else returns `{}` and the importer uses the file name.
  *
  * Pure TypeScript with no platform APIs: callers provide a `ByteSource`, so it runs on
  * device (expo-file-system FileHandle) and in Jest (Buffer) alike.
@@ -29,6 +31,10 @@ export interface AudioTags {
   genre?: string;
   durationMs?: number;
   picture?: Picture;
+  /** ReplayGain track gain in dB (negative = louder than the reference, turn down). */
+  replayGainDb?: number;
+  /** Embedded lyrics: plain text, or LRC with [mm:ss.xx] timestamps. */
+  lyrics?: string;
 }
 
 const MAX_TAG_BYTES = 32 * 1024 * 1024;
@@ -45,6 +51,7 @@ export async function readTags(src: ByteSource): Promise<AudioTags> {
     return merge(tags, mp3, await readId3v1(src));
   }
   if (ascii(head, 0, 4) === 'fLaC') return readFlac(src, 0);
+  if (ascii(head, 0, 4) === 'OggS') return readOgg(src);
   if (ascii(head, 4, 8) === 'ftyp') return readMp4(src);
   if (head[0] === 0xff && (head[1] & 0xe0) === 0xe0) {
     return merge(await readId3v1(src), await readMp3Duration(src, 0));
@@ -113,8 +120,13 @@ function utf8(b: Uint8Array): string {
 function utf16(b: Uint8Array, littleEndianDefault: boolean): string {
   let le = littleEndianDefault;
   let i = 0;
-  if (b.length >= 2 && b[0] === 0xff && b[1] === 0xfe) (le = true), (i = 2);
-  else if (b.length >= 2 && b[0] === 0xfe && b[1] === 0xff) (le = false), (i = 2);
+  if (b.length >= 2 && b[0] === 0xff && b[1] === 0xfe) {
+    le = true;
+    i = 2;
+  } else if (b.length >= 2 && b[0] === 0xfe && b[1] === 0xff) {
+    le = false;
+    i = 2;
+  }
   const units: number[] = [];
   for (; i + 1 < b.length; i += 2) units.push(le ? b[i] | (b[i + 1] << 8) : (b[i] << 8) | b[i + 1]);
   let s = '';
@@ -153,6 +165,8 @@ async function readId3v2(src: ByteSource): Promise<{ tags: AudioTags; end: numbe
   }
 
   const text: Record<string, string> = {};
+  const userText: Record<string, string> = {};
+  let lyrics: string | undefined;
   const pictures: (Picture & { type: number })[] = [];
   const idLen = major === 2 ? 3 : 4;
   const hdrLen = major === 2 ? 6 : 10;
@@ -177,7 +191,17 @@ async function readId3v2(src: ByteSource): Promise<{ tags: AudioTags; end: numbe
       if (fflags & 0x0002) data = deunsync(data);
     }
 
-    if (id[0] === 'T' && id !== 'TXXX' && id !== 'TXX') {
+    if (id === 'TXXX' || id === 'TXX') {
+      const enc = data[0];
+      const descEnd = skipTerminated(data, 1, enc);
+      const term = enc === 1 || enc === 2 ? 2 : 1;
+      const desc = decodeText(enc, data.subarray(1, Math.max(1, descEnd - term))).toUpperCase();
+      if (desc && !(desc in userText)) userText[desc] = decodeText(enc, data.subarray(descEnd));
+    } else if ((id === 'USLT' || id === 'ULT') && lyrics === undefined && data.length > 4) {
+      // encoding, 3-byte language, terminated description, then the lyrics.
+      const enc = data[0];
+      lyrics = clean(decodeText(enc, data.subarray(skipTerminated(data, 4, enc))));
+    } else if (id[0] === 'T') {
       text[id] = decodeText(data[0], data.subarray(1));
     } else if (id === 'APIC' || id === 'PIC') {
       const pic = parsePicture(id, data);
@@ -200,6 +224,8 @@ async function readId3v2(src: ByteSource): Promise<{ tags: AudioTags; end: numbe
       trackNo: parseTrackNo(text.TRCK ?? text.TRK),
       durationMs: Number.isFinite(tlen) && tlen > 0 ? tlen : undefined,
       picture: front ? { mime: front.mime, data: front.data } : undefined,
+      replayGainDb: parseGainDb(userText.REPLAYGAIN_TRACK_GAIN),
+      lyrics: lyrics ?? clean(userText.LYRICS),
     },
   };
 }
@@ -344,40 +370,192 @@ async function readFlac(src: ByteSource, start: number): Promise<AudioTags> {
       if (sampleRate > 0 && total > 0) out.durationMs = Math.round((total * 1000) / sampleRate);
     } else if (type === 4) {
       const b = await src.read(bodyAt, len);
-      let p = 4 + u32le(b, 0);
-      const count = u32le(b, p);
-      p += 4;
-      for (let k = 0; k < count && p + 4 <= b.length; k++) {
-        const l = u32le(b, p);
-        const entry = utf8(b.subarray(p + 4, p + 4 + l));
-        p += 4 + l;
-        const eq = entry.indexOf('=');
-        if (eq > 0) {
-          const key = entry.slice(0, eq).toUpperCase();
-          if (!(key in comments)) comments[key] = entry.slice(eq + 1);
-        }
-      }
+      for (const [k, v] of Object.entries(parseVorbisComment(b, 0))) if (!(k in comments)) comments[k] = v;
     } else if (type === 6 && !out.picture && len <= MAX_TAG_BYTES) {
-      const b = await src.read(bodyAt, len);
-      const picType = u32be(b, 0);
-      const mimeLen = u32be(b, 4);
-      const mime = latin1(b.subarray(8, 8 + mimeLen)) || 'image/jpeg';
-      let p = 8 + mimeLen;
-      p += 4 + u32be(b, p); // description
-      p += 16; // width, height, depth, colors
-      const dataLen = u32be(b, p);
-      const data = b.subarray(p + 4, p + 4 + dataLen);
-      if (data.length && (picType === 3 || !out.picture)) out.picture = { mime, data };
+      const pic = parseFlacPicture(await src.read(bodyAt, len));
+      if (pic) out.picture = pic;
     }
     if (last) break;
   }
-  out.title = clean(comments.TITLE);
-  out.artist = clean(comments.ARTIST);
-  out.album = clean(comments.ALBUM);
-  out.albumArtist = clean(comments.ALBUMARTIST ?? comments['ALBUM ARTIST']);
-  out.trackNo = parseTrackNo(comments.TRACKNUMBER);
-  out.genre = parseGenre(comments.GENRE);
+  return merge(fromVorbisComments(comments), out);
+}
+
+// ---------------------------------------------------------------- Vorbis comments (FLAC, Ogg)
+
+/** `KEY=value` pairs of a Vorbis comment block starting at `p` (keys upper-cased, first wins). */
+function parseVorbisComment(b: Uint8Array, p: number): Record<string, string> {
+  const comments: Record<string, string> = {};
+  if (p + 8 > b.length) return comments;
+  p += 4 + u32le(b, p); // vendor string
+  const count = u32le(b, p);
+  p += 4;
+  for (let k = 0; k < count && p + 4 <= b.length; k++) {
+    const l = u32le(b, p);
+    const entry = utf8(b.subarray(p + 4, p + 4 + l));
+    p += 4 + l;
+    const eq = entry.indexOf('=');
+    if (eq > 0) {
+      const key = entry.slice(0, eq).toUpperCase();
+      if (!(key in comments)) comments[key] = entry.slice(eq + 1);
+    }
+  }
+  return comments;
+}
+
+function fromVorbisComments(c: Record<string, string>): AudioTags {
+  // Opus files use R128 gain (Q7.8 dB relative to -23 LUFS); ReplayGain's reference is
+  // -18 LUFS, i.e. 5 dB louder.
+  const r128 = parseInt(c.R128_TRACK_GAIN ?? '', 10);
+  return {
+    title: clean(c.TITLE),
+    artist: clean(c.ARTIST),
+    album: clean(c.ALBUM),
+    albumArtist: clean(c.ALBUMARTIST ?? c['ALBUM ARTIST']),
+    trackNo: parseTrackNo(c.TRACKNUMBER),
+    genre: parseGenre(c.GENRE),
+    replayGainDb: parseGainDb(c.REPLAYGAIN_TRACK_GAIN) ?? (Number.isFinite(r128) ? sane(r128 / 256 + 5) : undefined),
+    lyrics: clean(c.LYRICS ?? c.UNSYNCEDLYRICS),
+  };
+}
+
+/** A FLAC PICTURE block (also used, base64-encoded, by Ogg's METADATA_BLOCK_PICTURE). */
+function parseFlacPicture(b: Uint8Array): Picture | undefined {
+  if (b.length < 32) return undefined;
+  const mimeLen = u32be(b, 4);
+  const mime = latin1(b.subarray(8, 8 + mimeLen)) || 'image/jpeg';
+  let p = 8 + mimeLen;
+  p += 4 + u32be(b, p); // description
+  p += 16; // width, height, depth, colors
+  const dataLen = u32be(b, p);
+  const data = b.subarray(p + 4, p + 4 + dataLen);
+  return data.length ? { mime, data } : undefined;
+}
+
+/** "-6.54 dB" → -6.54. Ignores junk and implausible values. */
+export function parseGainDb(s: string | undefined): number | undefined {
+  if (!s) return undefined;
+  const m = /^\s*([+-]?\d+(?:[.,]\d+)?)\s*(?:db)?\s*$/i.exec(s);
+  return m ? sane(parseFloat(m[1].replace(',', '.'))) : undefined;
+}
+
+function sane(db: number): number | undefined {
+  return Number.isFinite(db) && Math.abs(db) <= 30 ? Math.round(db * 100) / 100 : undefined;
+}
+
+// ---------------------------------------------------------------- Ogg (Vorbis, Opus)
+
+/**
+ * Reads the first two packets of the first logical stream: the identification header
+ * (codec, sample rate, Opus pre-skip) and the comment header. Duration comes from the
+ * granule position of the stream's last page.
+ */
+async function readOgg(src: ByteSource): Promise<AudioTags> {
+  const packets: Uint8Array[] = [];
+  let parts: Uint8Array[] = [];
+  let partsLen = 0;
+  let serial = -1;
+  let pos = 0;
+  for (let guard = 0; guard < 4096 && packets.length < 2 && pos + 27 <= src.size; guard++) {
+    const h = await src.read(pos, 27);
+    if (ascii(h, 0, 4) !== 'OggS') break;
+    const pageSerial = u32le(h, 14);
+    const nsegs = h[26];
+    const lacing = await src.read(pos + 27, nsegs);
+    const dataStart = pos + 27 + nsegs;
+    let total = 0;
+    for (const l of lacing) total += l;
+    pos = dataStart + total;
+    if (serial === -1) serial = pageSerial;
+    if (pageSerial !== serial) continue; // another multiplexed stream
+    const data = await src.read(dataStart, total);
+    let o = 0;
+    for (const l of lacing) {
+      if (partsLen + l > MAX_TAG_BYTES) return {};
+      parts.push(data.subarray(o, o + l));
+      partsLen += l;
+      o += l;
+      if (l < 255) {
+        packets.push(concat(parts, partsLen));
+        parts = [];
+        partsLen = 0;
+        if (packets.length === 2) break;
+      }
+    }
+  }
+  if (packets.length < 2) return {};
+  const [id, comment] = packets;
+
+  let rate = 0;
+  let preSkip = 0;
+  let comments: Record<string, string> = {};
+  if (ascii(id, 0, 8) === 'OpusHead') {
+    rate = 48000; // Opus granule positions always count 48 kHz samples
+    preSkip = id[10] | (id[11] << 8);
+    if (ascii(comment, 0, 8) === 'OpusTags') comments = parseVorbisComment(comment, 8);
+  } else if (id[0] === 1 && ascii(id, 1, 7) === 'vorbis') {
+    rate = u32le(id, 12);
+    if (comment[0] === 3 && ascii(comment, 1, 7) === 'vorbis') comments = parseVorbisComment(comment, 7);
+  } else {
+    return {};
+  }
+
+  const out = fromVorbisComments(comments);
+  const pictureB64 = comments.METADATA_BLOCK_PICTURE;
+  if (pictureB64) out.picture = parseFlacPicture(base64ToBytes(pictureB64));
+  else if (comments.COVERART) {
+    const data = base64ToBytes(comments.COVERART);
+    if (data.length) out.picture = { mime: comments.COVERARTMIME || 'image/jpeg', data };
+  }
+
+  const granule = await lastGranule(src, serial);
+  if (rate > 0 && granule > preSkip) out.durationMs = Math.round(((granule - preSkip) * 1000) / rate);
   return out;
+}
+
+/** Granule position of the last page of `serial`, searching the end of the file. */
+async function lastGranule(src: ByteSource, serial: number): Promise<number> {
+  const len = Math.min(src.size, 128 * 1024);
+  const tail = await src.read(src.size - len, len);
+  for (let i = tail.length - 27; i >= 0; i--) {
+    if (tail[i] === 0x4f && tail[i + 1] === 0x67 && tail[i + 2] === 0x67 && tail[i + 3] === 0x53 && u32le(tail, i + 14) === serial) {
+      const lo = u32le(tail, i + 6);
+      const hi = u32le(tail, i + 10);
+      if (hi === 0xffffffff) continue; // -1: no packet ends on this page
+      return hi * 2 ** 32 + lo;
+    }
+  }
+  return 0;
+}
+
+function concat(parts: Uint8Array[], length: number): Uint8Array {
+  if (parts.length === 1) return parts[0];
+  const out = new Uint8Array(length);
+  let o = 0;
+  for (const p of parts) {
+    out.set(p, o);
+    o += p.length;
+  }
+  return out;
+}
+
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+/** Standard base64 → bytes (ignores whitespace; no platform APIs needed). */
+export function base64ToBytes(s: string): Uint8Array {
+  const clean64 = s.replace(/[^A-Za-z0-9+/]/g, '');
+  const out = new Uint8Array(Math.floor((clean64.length * 3) / 4));
+  let o = 0;
+  for (let i = 0; i + 1 < clean64.length; i += 4) {
+    const n =
+      (B64.indexOf(clean64[i]) << 18) |
+      (B64.indexOf(clean64[i + 1]) << 12) |
+      ((i + 2 < clean64.length ? B64.indexOf(clean64[i + 2]) : 0) << 6) |
+      (i + 3 < clean64.length ? B64.indexOf(clean64[i + 3]) : 0);
+    out[o++] = (n >> 16) & 255;
+    if (i + 2 < clean64.length) out[o++] = (n >> 8) & 255;
+    if (i + 3 < clean64.length) out[o++] = n & 255;
+  }
+  return out.subarray(0, o);
 }
 
 // ---------------------------------------------------------------- MP4 / M4A
@@ -485,6 +663,16 @@ async function readMp4(src: ByteSource): Promise<AudioTags> {
           out.picture = { mime: kind === 14 ? 'image/png' : 'image/jpeg', data: value };
         }
         break;
+      case '©lyr':
+        out.lyrics = clean(utf8(value));
+        break;
+      case '----': {
+        // Freeform: mean ("com.apple.iTunes") + name ("replaygain_track_gain") + data.
+        const name = child(moov, item, 'name');
+        const label = name ? utf8(moov.subarray(name.start + 4, name.end)).toLowerCase() : '';
+        if (label === 'replaygain_track_gain' && out.replayGainDb === undefined) out.replayGainDb = parseGainDb(utf8(value));
+        break;
+      }
     }
   }
   return out;

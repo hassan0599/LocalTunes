@@ -17,6 +17,7 @@ import {
 
 import { CoverImage } from '@/components/CoverImage';
 import { DeviceMusicBanner } from '@/components/DeviceMusicBanner';
+import { FolderList } from '@/components/FolderList';
 import { parseCovers, PlaylistCover } from '@/components/PlaylistCover';
 import { showPrompt } from '@/components/Sheet';
 import { createPlaylist, listPlaylists, type PlaylistSummary } from '@/db/playlists';
@@ -41,17 +42,18 @@ import {
 import { scanDevice } from '@/services/media/deviceScan';
 import { pickAndImport } from '@/services/media/importer';
 import { playTracks } from '@/services/playback/PlaybackService';
-import { useLibraryVersion } from '@/state/library';
+import { useLibraryVersion, usePlaysVersion } from '@/state/library';
 import { selectCurrentTrack, usePlayer } from '@/state/player';
 import { useScan } from '@/state/scan';
 
-type Section = 'songs' | 'playlists' | 'albums' | 'artists';
+type Section = 'songs' | 'playlists' | 'albums' | 'artists' | 'folders';
 
 const SECTIONS: { value: Section; label: string }[] = [
   { value: 'songs', label: 'Songs' },
   { value: 'playlists', label: 'Playlists' },
   { value: 'albums', label: 'Albums' },
   { value: 'artists', label: 'Artists' },
+  { value: 'folders', label: 'Folders' },
 ];
 
 const LIST_HEADER_HEIGHT = 48;
@@ -109,6 +111,7 @@ export default function LibraryScreen() {
       {section === 'albums' && <Albums />}
       {section === 'artists' && <Artists />}
       {section === 'playlists' && <Playlists />}
+      {section === 'folders' && <FolderList path="" />}
     </View>
   );
 }
@@ -235,7 +238,8 @@ function Playlists() {
   const t = useTheme();
   const db = useSQLiteContext();
   const { data } = useLibraryQuery(listPlaylists, [], [] as PlaylistSummary[]);
-  const { data: smartCounts } = useLibraryQuery(smartPlaylistCounts, [], null as Awaited<ReturnType<typeof smartPlaylistCounts>> | null);
+  const plays = usePlaysVersion((s) => s.version);
+  const { data: smartCounts } = useLibraryQuery(smartPlaylistCounts, [plays], null as Awaited<ReturnType<typeof smartPlaylistCounts>> | null);
   const create = () =>
     showPrompt({
       title: "Give your playlist a name",

@@ -1,0 +1,21 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.nowplaying'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.nowplaying"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+}
+
+dependencies {
+  implementation 'androidx.core:core-ktx:1.15.0'
+  // Same media3 version as expo-audio, whose media session the widget controls.
+  implementation "androidx.media3:media3-session:1.9.1"
+}

@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -55,6 +56,7 @@ export function PlayerExtras() {
         onPress={chooseSpeed}
         a11y={`Playback speed ${formatRate(rate)}. Tap to change.`}
       />
+      <Chip icon="document-text-outline" label="Lyrics" active={false} onPress={() => router.push('/lyrics')} a11y="Show lyrics" />
       <Chip
         icon={sleep ? 'moon' : 'moon-outline'}
         label={sleep ? (sleep.kind === 'track' ? 'End of song' : remaining) : 'Sleep'}
@@ -84,7 +86,7 @@ function Chip({
   onPress,
   a11y,
 }: {
-  icon: 'speedometer-outline' | 'moon' | 'moon-outline';
+  icon: 'speedometer-outline' | 'moon' | 'moon-outline' | 'document-text-outline';
   label: string;
   active: boolean;
   onPress: () => void;

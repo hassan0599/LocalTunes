@@ -7,6 +7,7 @@ import { TrackListScreen } from '@/components/TrackListScreen';
 import { useLibraryQuery } from '@/components/useLibraryQuery';
 import type { Track } from '@/db/queries';
 import { isSmartPlaylistId, listSmartPlaylistTracks, smartPlaylist, type SmartPlaylistId } from '@/db/smartPlaylists';
+import { usePlaysVersion } from '@/state/library';
 
 const EMPTY: Record<SmartPlaylistId, string> = {
   'most-played': 'Play a few songs and your favourites will show up here.',
@@ -21,7 +22,8 @@ export default function SmartPlaylistScreen() {
   const raw = useLocalSearchParams<{ id: string }>().id ?? '';
   const id: SmartPlaylistId = isSmartPlaylistId(raw) ? raw : 'most-played';
   const playlist = smartPlaylist(id);
-  const { data: tracks } = useLibraryQuery((d) => listSmartPlaylistTracks(d, id), [id], [] as Track[]);
+  const plays = usePlaysVersion((s) => s.version);
+  const { data: tracks } = useLibraryQuery((d) => listSmartPlaylistTracks(d, id), [id, plays], [] as Track[]);
 
   return (
     <TrackListScreen

@@ -26,7 +26,12 @@ import {
   setTrackDurationIfMissing,
   type Track,
 } from '@/db/queries';
+import { flushListens, isListen, queueListen, TOKEN_KEY } from '@/services/listenbrainz/listenbrainz';
+import { usePlaysVersion } from '@/state/library';
+import { useNetwork } from '@/state/network';
 import { usePlayer } from '@/state/player';
+
+import { updateWidget } from '../../../modules/now-playing';
 
 import {
   nextRepeatMode,
@@ -35,10 +40,12 @@ import {
   toLoopMode,
   type PersistedQueue,
 } from './queue';
+import { gainToVolume, medianGain } from './normalize';
 import { clampRate, fadeVolume } from './sleep';
 
 const QUEUE_KEY = 'player.queue';
 const RATE_KEY = 'player.rate';
+const NORMALIZE_KEY = 'player.normalize';
 const POSITION_SAVE_INTERVAL_MS = 5000;
 
 let db: SQLiteDatabase | null = null;
@@ -56,6 +63,13 @@ let userStartedPlayback = false;
 let sleepTicker: ReturnType<typeof setInterval> | null = null;
 let sleepTrackId: number | null = null;
 let sleepVolume = 1;
+/** Volume normalization: this song's level, the library median for untagged songs, and the volume last sent. */
+let normVolume = 1;
+let libraryGain: number | null = null;
+let appliedVolume = 1;
+/** ListenBrainz: on while connected; progress of the current play through its song. */
+let scrobbling = false;
+let listen = { key: '', playedMs: 0, lastTime: 0, startedAt: 0, done: false };
 
 const get = usePlayer.getState;
 const set = usePlayer.setState;
@@ -73,7 +87,11 @@ export function setupPlayback(database: SQLiteDatabase): Promise<void> {
     });
     playlist = createAudioPlaylist({ updateInterval: 500, loop: 'none' });
     playlist.addListener('playlistStatusUpdate', onStatus);
+    // Home-screen widget follows the current song and play state (updates are de-duplicated).
+    usePlayer.subscribe(syncWidget);
     await restoreRate();
+    await restoreNormalize();
+    await refreshScrobbling();
     await restoreQueue();
   })();
   return setupPromise;
@@ -123,6 +141,7 @@ function handleStatus(s: AudioPlaylistStatus) {
     }
     lastIndex = s.currentIndex;
     set({ index: s.currentIndex, position: 0 });
+    updateNormalization(state.queue[s.currentIndex]);
     updateLockScreen();
     void persistQueue();
   }
@@ -141,6 +160,7 @@ function handleStatus(s: AudioPlaylistStatus) {
   });
 
   if (inSync) checkTrackSleep(s);
+  if (inSync) trackListen(s);
 
   const track = get().queue[s.currentIndex];
   if (!track || !db) return;
@@ -149,7 +169,7 @@ function handleStatus(s: AudioPlaylistStatus) {
     const key = `${s.currentIndex}:${track.id}`;
     if (key !== lastMarkedKey) {
       lastMarkedKey = key;
-      void markPlayed(db, track.id);
+      void markPlayed(db, track.id).then(() => usePlaysVersion.getState().bump(), () => {});
     }
   }
   if (s.isLoaded && s.duration > 0 && track.duration_ms == null) {
@@ -160,6 +180,14 @@ function handleStatus(s: AudioPlaylistStatus) {
     lastPositionSave = now;
     void persistQueue();
   }
+}
+
+// ---------------------------------------------------------------- home-screen widget
+
+function syncWidget() {
+  const { queue, index, isPlaying } = get();
+  const t = queue[index];
+  updateWidget({ title: t?.title ?? null, artist: t?.artist ?? null, isPlaying: !!t && isPlaying, artworkUri: t?.artwork_uri ?? null });
 }
 
 // ---------------------------------------------------------------- lock screen
@@ -212,6 +240,7 @@ function rebuild(queue: Track[], index: number) {
   }
   lastIndex = index;
   lastMarkedKey = '';
+  updateNormalization(queue[index]);
 }
 
 /** Play `tracks` starting at `startIndex` (album, playlist, search results…). */
@@ -233,6 +262,7 @@ export function playTracks(tracks: Track[], startIndex = 0) {
   set({ queue, originalQueue: tracks, index, position: 0, duration: 0 });
   rearmTrackSleep(queue[index]);
   rebuild(queue, index);
+  void refreshLibraryGain();
   updateLockScreen();
   p.play();
   void persistQueue();
@@ -481,10 +511,50 @@ function rearmTrackSleep(next: Track | undefined) {
 }
 
 function applySleepVolume(v: number) {
-  if (v === sleepVolume) return;
   sleepVolume = v;
+  applyVolume();
+}
+
+/** Send normalization × sleep fade to the player (only when it changes). */
+function applyVolume() {
+  const v = Math.round(normVolume * sleepVolume * 1000) / 1000;
+  if (v === appliedVolume) return;
+  appliedVolume = v;
   const p = playlist;
   if (p) safely('volume', () => (p.volume = v));
+}
+
+// ---------------------------------------------------------------- volume normalization
+
+function updateNormalization(track: Track | undefined) {
+  normVolume = gainToVolume(track?.replay_gain_db, libraryGain, get().normalize);
+  applyVolume();
+}
+
+/** Turn ReplayGain volume normalization on or off (persisted). */
+export function setNormalize(enabled: boolean) {
+  set({ normalize: enabled });
+  const { queue, index } = get();
+  updateNormalization(queue[index]);
+  if (db) void setSetting(db, NORMALIZE_KEY, enabled);
+}
+
+async function restoreNormalize() {
+  if (!db) return;
+  const saved = await getSetting<boolean>(db, NORMALIZE_KEY);
+  if (saved === false) set({ normalize: false });
+  await refreshLibraryGain();
+}
+
+/** Median ReplayGain of the library, used for songs without a tag. */
+async function refreshLibraryGain() {
+  if (!db) return;
+  try {
+    const rows = await db.getAllAsync<{ g: number }>('SELECT replay_gain_db AS g FROM tracks WHERE replay_gain_db IS NOT NULL');
+    libraryGain = medianGain(rows.map((r) => r.g));
+  } catch {
+    libraryGain = null;
+  }
 }
 
 /** Timed mode: runs every second (JS timers keep running while audio plays in the background). */
@@ -515,6 +585,52 @@ function fireSleepTimer(rewind: boolean) {
     if (rewind) void p.seekTo(0).catch(() => {});
   }
   clearSleep();
+}
+
+// ---------------------------------------------------------------- ListenBrainz
+
+/** Re-read whether ListenBrainz is connected (after connecting or disconnecting). */
+export async function refreshScrobbling() {
+  if (!db) return;
+  try {
+    scrobbling = !!(await getSetting<string>(db, TOKEN_KEY));
+  } catch {
+    scrobbling = false;
+  }
+}
+
+/** Test hook and settings shortcut. */
+export function setScrobbling(enabled: boolean) {
+  scrobbling = enabled;
+}
+
+/**
+ * Count real progress through the current song (position deltas while playing, so seeking
+ * ahead doesn't count and speed changes do). A new occurrence starts on a track change or
+ * when repeat-one jumps back to the start.
+ */
+function trackListen(s: AudioPlaylistStatus) {
+  const track = get().queue[s.currentIndex];
+  if (!track) return;
+  const key = `${s.currentIndex}:${track.id}`;
+  const restarted = key === listen.key && s.currentTime + 5 < listen.lastTime;
+  if (key !== listen.key || restarted) {
+    listen = { key, playedMs: 0, lastTime: s.currentTime, startedAt: Date.now(), done: false };
+    return;
+  }
+  const delta = s.currentTime - listen.lastTime;
+  listen.lastTime = s.currentTime;
+  if (s.playing && delta > 0 && delta < 3) listen.playedMs += delta * 1000;
+  const durationMs = track.duration_ms ?? (s.duration > 0 ? s.duration * 1000 : null);
+  if (!listen.done && scrobbling && db && isListen(listen.playedMs, durationMs)) {
+    listen.done = true;
+    const database = db;
+    void queueListen(database, { ...track, duration_ms: durationMs }, listen.startedAt)
+      .then((queued) => {
+        if (queued && useNetwork.getState().online) return flushListens(database);
+      })
+      .catch((e) => console.warn('listenbrainz: queue failed', e));
+  }
 }
 
 // ---------------------------------------------------------------- persistence

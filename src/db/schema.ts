@@ -177,6 +177,30 @@ const MIGRATIONS: string[] = [
     INSERT INTO tracks_fts(rowid, title, artist, album, genre) VALUES (new.id, new.title, new.artist, new.album, new.genre);
   END;
   `,
+
+  // v6 — 1.2: ReplayGain per track (volume normalization), cached lyrics, and a queue of
+  // listens waiting to be sent to ListenBrainz (denormalized so they survive deletes).
+  `
+  ALTER TABLE tracks ADD COLUMN replay_gain_db REAL;
+
+  CREATE TABLE lyrics (
+    track_id   INTEGER PRIMARY KEY REFERENCES tracks(id) ON DELETE CASCADE,
+    synced     TEXT,
+    plain      TEXT,
+    source     TEXT NOT NULL,
+    fetched_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE listens (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    listened_at INTEGER NOT NULL,
+    artist      TEXT NOT NULL,
+    title       TEXT NOT NULL,
+    album       TEXT,
+    duration_ms INTEGER,
+    recording_mbid TEXT
+  );
+  `,
 ];
 
 export async function migrate(db: SQLiteDatabase): Promise<void> {

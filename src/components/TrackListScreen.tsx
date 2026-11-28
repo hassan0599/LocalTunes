@@ -7,7 +7,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { Track } from '@/db/queries';
 import { playTracks, playTracksShuffled } from '@/services/playback/PlaybackService';
-import { formatTime } from '@/services/playback/queue';
 import { selectCurrentTrack, usePlayer } from '@/state/player';
 
 import { MiniPlayer } from './MiniPlayer';

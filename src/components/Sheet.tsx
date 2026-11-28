@@ -5,7 +5,7 @@
  */
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ComponentProps } from 'react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { create } from 'zustand';
@@ -102,8 +102,13 @@ export function SheetHost() {
 
 function PromptModal({ spec }: { spec: PromptSpec | null }) {
   const t = useTheme();
-  const [value, setValue] = useState('');
-  useEffect(() => setValue(spec?.initial ?? ''), [spec]);
+  const [value, setValue] = useState(spec?.initial ?? '');
+  // A new prompt starts from its own initial text (state adjusted during render, not in an effect).
+  const [shownSpec, setShownSpec] = useState(spec);
+  if (spec !== shownSpec) {
+    setShownSpec(spec);
+    setValue(spec?.initial ?? '');
+  }
   const submit = () => {
     const v = value.trim();
     if (!v || !spec) return;

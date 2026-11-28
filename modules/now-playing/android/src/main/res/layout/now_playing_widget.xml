@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/np_root"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="@drawable/np_background"
+  android:gravity="center_vertical"
+  android:orientation="horizontal"
+  android:padding="8dp">
+
+  <ImageView
+    android:id="@+id/np_art"
+    android:layout_width="48dp"
+    android:layout_height="48dp"
+    android:background="@drawable/np_art_background"
+    android:clipToOutline="true"
+    android:importantForAccessibility="no"
+    android:scaleType="centerCrop"
+    android:src="@drawable/np_note" />
+
+  <LinearLayout
+    android:id="@+id/np_text"
+    android:layout_width="0dp"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="10dp"
+    android:layout_weight="1"
+    android:orientation="vertical">
+
+    <TextView
+      android:id="@+id/np_title"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:ellipsize="end"
+      android:maxLines="1"
+      android:text="@string/np_nothing_playing"
+      android:textColor="#FFF3F4F6"
+      android:textSize="14sp"
+      android:textStyle="bold" />
+
+    <TextView
+      android:id="@+id/np_artist"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:ellipsize="end"
+      android:maxLines="1"
+      android:text="@string/np_tap_to_open"
+      android:textColor="#FFA3AAB6"
+      android:textSize="12sp" />
+  </LinearLayout>
+
+  <ImageButton
+    android:id="@+id/np_previous"
+    android:layout_width="44dp"
+    android:layout_height="44dp"
+    android:background="@android:color/transparent"
+    android:contentDescription="@string/np_previous"
+    android:src="@drawable/np_previous" />
+
+  <ImageButton
+    android:id="@+id/np_play"
+    android:layout_width="44dp"
+    android:layout_height="44dp"
+    android:layout_marginStart="2dp"
+    android:layout_marginEnd="2dp"
+    android:background="@drawable/np_play_background"
+    android:contentDescription="@string/np_play"
+    android:src="@drawable/np_play" />
+
+  <ImageButton
+    android:id="@+id/np_next"
+    android:layout_width="44dp"
+    android:layout_height="44dp"
+    android:background="@android:color/transparent"
+    android:contentDescription="@string/np_next"
+    android:src="@drawable/np_next" />
+</LinearLayout>
