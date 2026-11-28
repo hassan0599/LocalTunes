@@ -11,12 +11,17 @@ import { setWifiOnly } from '@/services/downloads/manager';
 import { hiddenDeviceSongCount, restoreHiddenDeviceSongs, scanDevice, type ScanResult } from '@/services/media/deviceScan';
 import { cacheStats, clearCache } from '@/services/musicbrainz/cache';
 import { clearCoverCache, coverCacheBytes } from '@/services/musicbrainz/coverArt';
-import { setNormalize } from '@/services/playback/PlaybackService';
+import { BackupError } from '@/services/backup/backup';
+import { exportBackup, pickAndRestore, type RestoreResult } from '@/services/backup/io';
+import { setNormalize, setPlaybackRate } from '@/services/playback/PlaybackService';
 import { useDownloads } from '@/state/downloads';
 import { useLibraryVersion } from '@/state/library';
 import { usePlayer } from '@/state/player';
+import { loadWishlist } from '@/state/wishlist';
 
 const REPO_URL = 'https://github.com/hassan0599/LocalTunes';
+
+type Busy = 'scan' | 'restore' | 'cache' | 'backup' | 'import';
 
 export default function SettingsScreen() {
   const t = useTheme();
@@ -26,7 +31,7 @@ export default function SettingsScreen() {
   const [hidden, setHidden] = useState(0);
   const [gainInfo, setGainInfo] = useState<{ tagged: number; total: number } | null>(null);
   const normalize = usePlayer((s) => s.normalize);
-  const [busy, setBusy] = useState<'scan' | 'restore' | 'cache' | null>(null);
+  const [busy, setBusy] = useState<Busy | null>(null);
 
   // Bumped after an action to re-read cache size and hidden-song count.
   const [version, setVersion] = useState(0);
@@ -52,7 +57,7 @@ export default function SettingsScreen() {
     };
   }, [db, version]);
 
-  const run = async (kind: 'scan' | 'restore' | 'cache', fn: () => Promise<void>) => {
+  const run = async (kind: Busy, fn: () => Promise<void>) => {
     setBusy(kind);
     try {
       await fn();
@@ -88,6 +93,50 @@ export default function SettingsScreen() {
         },
       ],
     );
+
+  const backup = () =>
+    run('backup', async () => {
+      const r = await exportBackup(db);
+      if (r) {
+        Alert.alert(
+          'Backup saved',
+          `“${r.fileName}”${r.playlists ? ` and ${r.playlists} playlist ${r.playlists === 1 ? 'file' : 'files'} (.m3u8)` : ''} were saved in the folder you picked. Keep them somewhere safe, like a cloud drive.`,
+        );
+      }
+    });
+
+  const restoreFile = () =>
+    run('import', async () => {
+      let r: RestoreResult | null;
+      try {
+        r = await pickAndRestore(db);
+      } catch (e) {
+        if (e instanceof BackupError) {
+          Alert.alert('Can’t restore this file', e.message);
+          return;
+        }
+        throw e;
+      }
+      if (!r) return;
+      useLibraryVersion.getState().bump();
+      if (r.kind === 'm3u') {
+        const { name, entries, matched } = r.report;
+        Alert.alert('Playlist imported', `“${name}”: ${matched} of ${entries} songs found in your library.`);
+        return;
+      }
+      const rep = r.report;
+      // Apply restored settings to the running app too.
+      if (typeof rep.settings['player.rate'] === 'number') setPlaybackRate(rep.settings['player.rate']);
+      if (typeof rep.settings['player.normalize'] === 'boolean') setNormalize(rep.settings['player.normalize']);
+      if (typeof rep.settings['downloads.wifiOnly'] === 'boolean') await setWifiOnly(rep.settings['downloads.wifiOnly']);
+      await loadWishlist(db);
+      const lines = [
+        `${rep.matched} of ${rep.songs} songs found in your library (play counts merged).`,
+        `${rep.playlists} ${rep.playlists === 1 ? 'playlist' : 'playlists'} restored${rep.playlistSongsMissing ? `; ${rep.playlistSongsMissing} playlist ${rep.playlistSongsMissing === 1 ? 'song isn’t' : 'songs aren’t'} on this phone yet` : ''}.`,
+      ];
+      if (rep.wishlist) lines.push(`${rep.wishlist} wishlist ${rep.wishlist === 1 ? 'item' : 'items'} added.`);
+      Alert.alert('Backup restored', lines.join('\n'));
+    });
 
   const clear = () =>
     Alert.alert('Clear saved Discover pages?', 'Artist pages, albums and cover art from Discover are downloaded again next time you open them online. Your music is not affected.', [
@@ -161,6 +210,23 @@ export default function SettingsScreen() {
             />
           </Section>
         )}
+
+        <Section title="Backup">
+          <Row
+            icon="cloud-upload-outline"
+            title="Back up library"
+            subtitle="Save playlists, play counts and wishlist to a folder you choose"
+            onPress={busy ? undefined : backup}
+            right={busy === 'backup' ? <ActivityIndicator color={t.accent} /> : undefined}
+          />
+          <Row
+            icon="cloud-download-outline"
+            title="Restore or import a playlist"
+            subtitle="Open a LocalTunes backup, or an .m3u playlist from another player"
+            onPress={busy ? undefined : restoreFile}
+            right={busy === 'import' ? <ActivityIndicator color={t.accent} /> : undefined}
+          />
+        </Section>
 
         <Section title="Storage">
           <Row
