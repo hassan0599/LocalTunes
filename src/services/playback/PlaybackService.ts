@@ -36,10 +36,12 @@ import {
   toLoopMode,
   type PersistedQueue,
 } from './queue';
+import { gainToVolume, medianGain } from './normalize';
 import { clampRate, fadeVolume } from './sleep';
 
 const QUEUE_KEY = 'player.queue';
 const RATE_KEY = 'player.rate';
+const NORMALIZE_KEY = 'player.normalize';
 const POSITION_SAVE_INTERVAL_MS = 5000;
 
 let db: SQLiteDatabase | null = null;
@@ -57,6 +59,10 @@ let userStartedPlayback = false;
 let sleepTicker: ReturnType<typeof setInterval> | null = null;
 let sleepTrackId: number | null = null;
 let sleepVolume = 1;
+/** Volume normalization: this song's level, the library median for untagged songs, and the volume last sent. */
+let normVolume = 1;
+let libraryGain: number | null = null;
+let appliedVolume = 1;
 
 const get = usePlayer.getState;
 const set = usePlayer.setState;
@@ -75,6 +81,7 @@ export function setupPlayback(database: SQLiteDatabase): Promise<void> {
     playlist = createAudioPlaylist({ updateInterval: 500, loop: 'none' });
     playlist.addListener('playlistStatusUpdate', onStatus);
     await restoreRate();
+    await restoreNormalize();
     await restoreQueue();
   })();
   return setupPromise;
@@ -124,6 +131,7 @@ function handleStatus(s: AudioPlaylistStatus) {
     }
     lastIndex = s.currentIndex;
     set({ index: s.currentIndex, position: 0 });
+    updateNormalization(state.queue[s.currentIndex]);
     updateLockScreen();
     void persistQueue();
   }
@@ -213,6 +221,7 @@ function rebuild(queue: Track[], index: number) {
   }
   lastIndex = index;
   lastMarkedKey = '';
+  updateNormalization(queue[index]);
 }
 
 /** Play `tracks` starting at `startIndex` (album, playlist, search results…). */
@@ -234,6 +243,7 @@ export function playTracks(tracks: Track[], startIndex = 0) {
   set({ queue, originalQueue: tracks, index, position: 0, duration: 0 });
   rearmTrackSleep(queue[index]);
   rebuild(queue, index);
+  void refreshLibraryGain();
   updateLockScreen();
   p.play();
   void persistQueue();
@@ -482,10 +492,50 @@ function rearmTrackSleep(next: Track | undefined) {
 }
 
 function applySleepVolume(v: number) {
-  if (v === sleepVolume) return;
   sleepVolume = v;
+  applyVolume();
+}
+
+/** Send normalization × sleep fade to the player (only when it changes). */
+function applyVolume() {
+  const v = Math.round(normVolume * sleepVolume * 1000) / 1000;
+  if (v === appliedVolume) return;
+  appliedVolume = v;
   const p = playlist;
   if (p) safely('volume', () => (p.volume = v));
+}
+
+// ---------------------------------------------------------------- volume normalization
+
+function updateNormalization(track: Track | undefined) {
+  normVolume = gainToVolume(track?.replay_gain_db, libraryGain, get().normalize);
+  applyVolume();
+}
+
+/** Turn ReplayGain volume normalization on or off (persisted). */
+export function setNormalize(enabled: boolean) {
+  set({ normalize: enabled });
+  const { queue, index } = get();
+  updateNormalization(queue[index]);
+  if (db) void setSetting(db, NORMALIZE_KEY, enabled);
+}
+
+async function restoreNormalize() {
+  if (!db) return;
+  const saved = await getSetting<boolean>(db, NORMALIZE_KEY);
+  if (saved === false) set({ normalize: false });
+  await refreshLibraryGain();
+}
+
+/** Median ReplayGain of the library, used for songs without a tag. */
+async function refreshLibraryGain() {
+  if (!db) return;
+  try {
+    const rows = await db.getAllAsync<{ g: number }>('SELECT replay_gain_db AS g FROM tracks WHERE replay_gain_db IS NOT NULL');
+    libraryGain = medianGain(rows.map((r) => r.g));
+  } catch {
+    libraryGain = null;
+  }
 }
 
 /** Timed mode: runs every second (JS timers keep running while audio plays in the background). */

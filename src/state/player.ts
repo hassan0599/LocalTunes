@@ -22,6 +22,8 @@ export interface PlayerState {
   rate: number;
   /** Active sleep timer, if any. */
   sleep: SleepTimer | null;
+  /** Volume normalization from ReplayGain tags. */
+  normalize: boolean;
 }
 
 export const usePlayer = create<PlayerState>(() => ({
@@ -36,6 +38,7 @@ export const usePlayer = create<PlayerState>(() => ({
   shuffle: false,
   rate: 1,
   sleep: null,
+  normalize: true,
 }));
 
 export const selectCurrentTrack = (s: PlayerState): Track | undefined => s.queue[s.index];

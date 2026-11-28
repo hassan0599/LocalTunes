@@ -310,3 +310,39 @@ describe('queue editing', () => {
   });
 });
 
+
+describe('volume normalization', () => {
+  const loud = (id: number, gain: number | null) => ({ ...track(id), replay_gain_db: gain }) as Track;
+
+  it('turns tagged songs down, follows track changes, and can be switched off', async () => {
+    const { svc } = await load();
+    await svc.setupPlayback({} as never);
+    svc.playTracks([loud(1, -6), loud(2, -12), loud(3, 3)], 0);
+    expect(mockNative.obj?.volume).toBeCloseTo(0.501, 3);
+    mockNative.index = 1; // the next song starts on its own
+    mockNative.listener?.({ currentIndex: 1, trackCount: 3, currentTime: 0, duration: 100, playing: true, isBuffering: false, isLoaded: true });
+    expect(mockNative.obj?.volume).toBeCloseTo(0.251, 3);
+    svc.setNormalize(false);
+    expect(mockNative.obj?.volume).toBe(1);
+    svc.setNormalize(true);
+    svc.skipTo(2);
+    flush();
+    expect(mockNative.obj?.volume).toBe(1); // +3 dB can't go above full volume
+  });
+
+  it('multiplies with the sleep timer fade', async () => {
+    jest.useFakeTimers({ now: 0 });
+    try {
+      const { svc } = await load();
+      await svc.setupPlayback({} as never);
+      svc.playTracks([loud(1, -6)], 0);
+      svc.startSleepTimer(1);
+      svc.tickSleep(55_000); // halfway through the fade
+      expect(mockNative.obj?.volume).toBeCloseTo(0.251, 2);
+      svc.cancelSleepTimer();
+      expect(mockNative.obj?.volume).toBeCloseTo(0.501, 3);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});

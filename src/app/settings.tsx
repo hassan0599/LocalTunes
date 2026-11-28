@@ -11,8 +11,10 @@ import { setWifiOnly } from '@/services/downloads/manager';
 import { hiddenDeviceSongCount, restoreHiddenDeviceSongs, scanDevice, type ScanResult } from '@/services/media/deviceScan';
 import { cacheStats, clearCache } from '@/services/musicbrainz/cache';
 import { clearCoverCache, coverCacheBytes } from '@/services/musicbrainz/coverArt';
+import { setNormalize } from '@/services/playback/PlaybackService';
 import { useDownloads } from '@/state/downloads';
 import { useLibraryVersion } from '@/state/library';
+import { usePlayer } from '@/state/player';
 
 const REPO_URL = 'https://github.com/hassan0599/LocalTunes';
 
@@ -22,6 +24,8 @@ export default function SettingsScreen() {
   const wifiOnly = useDownloads((s) => s.wifiOnly);
   const [cacheBytes, setCacheBytes] = useState<number | null>(null);
   const [hidden, setHidden] = useState(0);
+  const [gainInfo, setGainInfo] = useState<{ tagged: number; total: number } | null>(null);
+  const normalize = usePlayer((s) => s.normalize);
   const [busy, setBusy] = useState<'scan' | 'restore' | 'cache' | null>(null);
 
   // Bumped after an action to re-read cache size and hidden-song count.
@@ -30,11 +34,16 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([cacheStats(db), hiddenDeviceSongCount(db)]).then(
-      ([stats, hiddenCount]) => {
+    Promise.all([
+      cacheStats(db),
+      hiddenDeviceSongCount(db),
+      db.getFirstAsync<{ tagged: number; total: number }>('SELECT COUNT(replay_gain_db) AS tagged, COUNT(*) AS total FROM tracks'),
+    ]).then(
+      ([stats, hiddenCount, gains]) => {
         if (!alive) return;
         setCacheBytes(stats.bytes + coverCacheBytes());
         setHidden(hiddenCount);
+        setGainInfo(gains);
       },
       (e) => console.warn('settings: stats failed', e),
     );
@@ -97,6 +106,26 @@ export default function SettingsScreen() {
   return (
     <StackScreen title="Settings">
       <ScrollView contentContainerStyle={styles.content}>
+        <Section title="Playback">
+          <Row
+            icon="volume-medium-outline"
+            title="Normalize volume"
+            subtitle={
+              'Plays songs at a similar loudness using their ReplayGain tags' +
+              (gainInfo ? ` (${gainInfo.tagged} of ${gainInfo.total} ${gainInfo.total === 1 ? 'song has' : 'songs have'} them)` : '')
+            }
+            right={
+              <Switch
+                value={normalize}
+                onValueChange={setNormalize}
+                trackColor={{ true: t.accent, false: t.elevated }}
+                thumbColor="#FFFFFF"
+                accessibilityLabel="Normalize volume"
+              />
+            }
+          />
+        </Section>
+
         <Section title="Downloads">
           <Row
             icon="wifi-outline"

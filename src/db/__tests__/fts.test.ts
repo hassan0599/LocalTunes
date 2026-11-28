@@ -55,7 +55,12 @@ describe('migrations', () => {
     await migrate(db);
     await migrate(db);
     const { user_version } = (await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version'))!;
-    expect(user_version).toBe(5);
+    expect(user_version).toBe(6);
+    // v6: ReplayGain column, lyrics cache and the ListenBrainz queue.
+    const cols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(tracks)');
+    expect(cols.map((c) => c.name)).toContain('replay_gain_db');
+    const tables = await db.getAllAsync<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table'");
+    expect(tables.map((t) => t.name)).toEqual(expect.arrayContaining(['lyrics', 'listens']));
   });
 });
 

@@ -21,13 +21,15 @@ export interface Track {
   added_at: number;
   last_played_at: number | null;
   play_count: number;
+  /** ReplayGain track gain in dB, from the file's tags (null when untagged). */
+  replay_gain_db: number | null;
 }
 
 export type NewTrack = Pick<Track, 'title' | 'file_uri' | 'source'> &
   Partial<
     Pick<
       Track,
-      'artist' | 'album' | 'album_artist' | 'track_no' | 'duration_ms' | 'artwork_uri' | 'license' | 'mbid' | 'device_id' | 'genre'
+      'artist' | 'album' | 'album_artist' | 'track_no' | 'duration_ms' | 'artwork_uri' | 'license' | 'mbid' | 'device_id' | 'genre' | 'replay_gain_db'
     >
   >;
 
@@ -79,8 +81,8 @@ export async function getTracksByIds(db: SQLiteDatabase, ids: number[]): Promise
 
 export async function insertTrack(db: SQLiteDatabase, t: NewTrack): Promise<number> {
   const res = await db.runAsync(
-    `INSERT INTO tracks (title, artist, album, album_artist, track_no, duration_ms, file_uri, artwork_uri, source, license, mbid, device_id, genre)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO tracks (title, artist, album, album_artist, track_no, duration_ms, file_uri, artwork_uri, source, license, mbid, device_id, genre, replay_gain_db)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     t.title,
     t.artist ?? null,
     t.album ?? null,
@@ -94,6 +96,7 @@ export async function insertTrack(db: SQLiteDatabase, t: NewTrack): Promise<numb
     t.mbid ?? null,
     t.device_id ?? null,
     t.genre ?? null,
+    t.replay_gain_db ?? null,
   );
   return res.lastInsertRowId;
 }

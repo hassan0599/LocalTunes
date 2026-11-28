@@ -1,7 +1,7 @@
 /// <reference types="jest" />
 /// <reference types="node" />
 
-import { parseGenre, readTags, tagsFromFileName, type ByteSource } from '../tags';
+import { base64ToBytes, parseGainDb, parseGenre, readTags, tagsFromFileName, type ByteSource } from '../tags';
 
 // ---------------------------------------------------------------- fixture builders
 
@@ -182,3 +182,131 @@ describe('tagsFromFileName', () => {
     expect(tagsFromFileName(name)).toMatchObject(expected);
   });
 });
+
+// ---------------------------------------------------------------- Ogg fixtures
+
+const le16 = (n: number) => [n & 255, (n >>> 8) & 255];
+const le64 = (n: number) => [...le32(n % 2 ** 32), ...le32(Math.floor(n / 2 ** 32))];
+
+/** Split packets into Ogg pages of at most `maxSegs` lacing values (so packets can span pages). */
+function oggStream(packets: Uint8Array[], opts: { serial?: number; finalGranule: number; maxSegs?: number }) {
+  const serial = opts.serial ?? 0x1234;
+  const maxSegs = opts.maxSegs ?? 255;
+  const segs: { data: Uint8Array; len: number }[] = [];
+  for (const pk of packets) {
+    let o = 0;
+    while (pk.length - o >= 255) {
+      segs.push({ data: pk.subarray(o, o + 255), len: 255 });
+      o += 255;
+    }
+    segs.push({ data: pk.subarray(o), len: pk.length - o });
+  }
+  const pages: Uint8Array[] = [];
+  for (let i = 0, seq = 0; i < segs.length; i += maxSegs, seq++) {
+    const chunk = segs.slice(i, i + maxSegs);
+    const last = i + maxSegs >= segs.length;
+    pages.push(
+      bytes('OggS', [0, seq === 0 ? 2 : 0], le64(last ? opts.finalGranule : 0), le32(serial), le32(seq), le32(0), [chunk.length], chunk.map((c) => c.len), ...chunk.map((c) => c.data)),
+    );
+  }
+  // A final audio page carrying the real end position.
+  pages.push(bytes('OggS', [0, 4], le64(opts.finalGranule), le32(serial), le32(999), le32(0), [1], [3], [9, 9, 9]));
+  return bytes(...pages);
+}
+
+function vorbisComment(entries: string[]) {
+  return bytes(le32(6), 'vendor', le32(entries.length), ...entries.flatMap((c) => [Uint8Array.from(le32(utf8(c).length)), utf8(c)]));
+}
+
+function flacPictureBlock(mime: string, data: Uint8Array) {
+  return bytes(be32(3), be32(mime.length), mime, be32(0), be32(0), be32(0), be32(0), be32(0), be32(data.length), data);
+}
+
+describe('readTags: Ogg Vorbis', () => {
+  it('reads Vorbis comments and the duration from the last page', async () => {
+    const idHeader = bytes([1], 'vorbis', le32(0), [2], le32(44100), new Array(16).fill(0));
+    const comment = bytes([3], 'vorbis', vorbisComment(['TITLE=Hjartað hlær', 'ARTIST=Sigur Rós', 'ALBUM=Takk...', 'TRACKNUMBER=4/11', 'GENRE=post-rock', 'REPLAYGAIN_TRACK_GAIN=-7.32 dB']), [1]);
+    const file = oggStream([idHeader, comment], { finalGranule: 44100 * 245 });
+    expect(await readTags(source(file))).toMatchObject({
+      title: 'Hjartað hlær',
+      artist: 'Sigur Rós',
+      album: 'Takk...',
+      trackNo: 4,
+      genre: 'Post-Rock',
+      durationMs: 245_000,
+      replayGainDb: -7.32,
+    });
+  });
+
+  it('reassembles a comment header that spans several pages', async () => {
+    const idHeader = bytes([1], 'vorbis', le32(0), [2], le32(48000), new Array(16).fill(0));
+    const long = 'x'.repeat(3000);
+    const comment = bytes([3], 'vorbis', vorbisComment([`DESCRIPTION=${long}`, 'TITLE=Long Notes']), [1]);
+    const file = oggStream([idHeader, comment], { finalGranule: 48000 * 10, maxSegs: 4 });
+    const tags = await readTags(source(file));
+    expect(tags.title).toBe('Long Notes');
+    expect(tags.durationMs).toBe(10_000);
+  });
+});
+
+describe('readTags: Opus', () => {
+  it('reads OpusTags, an embedded picture, R128 gain and pre-skip-corrected duration', async () => {
+    const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
+    const picture = Buffer.from(flacPictureBlock('image/png', png)).toString('base64');
+    const head = bytes('OpusHead', [1, 2], le16(312), le32(48000), le16(0), [0]);
+    const tags = bytes('OpusTags', vorbisComment(['TITLE=Opus Song', 'ARTIST=Encoder Fan', `METADATA_BLOCK_PICTURE=${picture}`, 'R128_TRACK_GAIN=-1280']));
+    const file = oggStream([head, tags], { finalGranule: 312 + 48000 * 3 });
+    const out = await readTags(source(file));
+    expect(out).toMatchObject({ title: 'Opus Song', artist: 'Encoder Fan', durationMs: 3000, replayGainDb: 0 });
+    expect(out.picture?.mime).toBe('image/png');
+    expect(Array.from(out.picture!.data)).toEqual(Array.from(png));
+  });
+
+  it('prefers REPLAYGAIN_TRACK_GAIN over R128 when both exist', async () => {
+    const head = bytes('OpusHead', [1, 2], le16(0), le32(48000), le16(0), [0]);
+    const tags = bytes('OpusTags', vorbisComment(['REPLAYGAIN_TRACK_GAIN=-3.5 dB', 'R128_TRACK_GAIN=-1280']));
+    expect((await readTags(source(oggStream([head, tags], { finalGranule: 48000 })))).replayGainDb).toBe(-3.5);
+  });
+
+  it('returns nothing for an Ogg stream of another codec', async () => {
+    const file = oggStream([bytes('\x80theora', new Array(20).fill(0)), bytes('x')], { finalGranule: 1 });
+    expect(await readTags(source(file))).toEqual({});
+  });
+});
+
+describe('ReplayGain', () => {
+  it('reads TXXX from ID3v2', async () => {
+    const txxx = id3Frame('TXXX', bytes([0], 'REPLAYGAIN_TRACK_GAIN', [0], '-9.10 dB'));
+    const other = id3Frame('TXXX', bytes([0], 'replaygain_album_gain', [0], '-8 dB'));
+    const tags = await readTags(source(bytes(id3v23(id3Frame('TIT2', bytes([0], 'Loud')), other, txxx), xingFrame(10))));
+    expect(tags.title).toBe('Loud');
+    expect(tags.replayGainDb).toBe(-9.1);
+  });
+
+  it('reads Vorbis comments in FLAC', async () => {
+    const si = new Uint8Array(34);
+    const vc = vorbisComment(['REPLAYGAIN_TRACK_GAIN=+2.10 dB']);
+    const file = bytes('fLaC', [0], be24(34), si, [0x84], be24(vc.length), vc, new Uint8Array(16));
+    expect((await readTags(source(file))).replayGainDb).toBe(2.1);
+  });
+
+  it('parses gain strings defensively', () => {
+    expect(parseGainDb('-6.54 dB')).toBe(-6.54);
+    expect(parseGainDb('+1,5 dB')).toBe(1.5);
+    expect(parseGainDb('3')).toBe(3);
+    expect(parseGainDb('loud')).toBeUndefined();
+    expect(parseGainDb('-99 dB')).toBeUndefined();
+    expect(parseGainDb(undefined)).toBeUndefined();
+  });
+});
+
+describe('base64ToBytes', () => {
+  it('matches Node for all padding cases', () => {
+    for (const s of ['', 'a', 'ab', 'abc', 'abcd', 'hello world', '\u00ff\u0000\u0080']) {
+      const enc = Buffer.from(s, 'latin1').toString('base64');
+      expect(Array.from(base64ToBytes(enc))).toEqual(Array.from(Buffer.from(s, 'latin1')));
+      expect(Array.from(base64ToBytes(enc.replace(/=+$/, '')))).toEqual(Array.from(Buffer.from(s, 'latin1')));
+    }
+  });
+});
+

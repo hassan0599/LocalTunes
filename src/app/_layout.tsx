@@ -10,7 +10,7 @@ import { DB_NAME, migrate } from '@/db/schema';
 import { installCrashRecorder, showLastCrashIfAny } from '@/services/crashLog';
 import { startDownloads } from '@/services/downloads/manager';
 import { scanDevice, type ScanTrigger } from '@/services/media/deviceScan';
-import { backfillGenres } from '@/services/media/genreBackfill';
+import { backfillTags } from '@/services/media/tagBackfill';
 import { pruneCache } from '@/services/musicbrainz/cache';
 import { setupPlayback } from '@/services/playback/PlaybackService';
 import { startNetworkMonitoring } from '@/state/network';
@@ -48,11 +48,12 @@ function Bootstrap({ children }: { children: ReactNode }) {
         (r) => __DEV__ && console.log('device scan', trigger, JSON.stringify(r)),
         (e) => console.warn('device scan failed', e),
       );
-    // After the launch scan, fill in genres for songs added before genres were stored.
+    // After the launch scan, re-read tags once for what older versions didn't store
+    // (genres, ReplayGain, Ogg/Opus metadata).
     void scan('launch').then(() =>
-      backfillGenres(db).then(
-        (n) => __DEV__ && n && console.log('genre backfill', n),
-        (e) => console.warn('genre backfill failed', e),
+      backfillTags(db).then(
+        (n) => __DEV__ && n && console.log('tag backfill', n),
+        (e) => console.warn('tag backfill failed', e),
       ),
     );
     const sub = AppState.addEventListener('change', (state) => {
